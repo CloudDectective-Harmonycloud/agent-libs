@@ -4906,6 +4906,8 @@ void sinsp_parser::parse_cpu_hotplug_enter(sinsp_evt *evt)
 {
 	if(m_inspector->is_live())
 	{
+		printf("CPU %s configuration change detected. Aborting.",
+		       evt->get_param_value_str("cpu").c_str());
 		throw sinsp_exception("CPU " + evt->get_param_value_str("cpu") +
 				      " configuration change detected. Aborting.");
 	}
