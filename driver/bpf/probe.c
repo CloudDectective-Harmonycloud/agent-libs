@@ -513,6 +513,11 @@ BPF_KPROBE(tcp_set_state)
 	if (!settings)
 		return 0;
 	struct sock *sk = (struct sock *)_READ(ctx->di);
+	u16 family = 0;
+	bpf_probe_read(&family, sizeof(family), (void *)&sk->__sk_common.skc_family);
+	if(family != AF_INET)
+		return 0;
+
 	const struct inet_sock *inet = inet_sk(sk);
 	u8 old_state = 0;
 	bpf_probe_read(&old_state, sizeof(old_state), (void *)&sk->sk_state);
@@ -527,6 +532,7 @@ BPF_KPROBE(tcp_set_state)
 
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 BPF_PROBE("tcp/", tcp_send_reset, tcp_reset_args){
 	struct sysdig_bpf_settings *settings;
 	enum ppm_event_type evt_type;
@@ -555,6 +561,7 @@ BPF_PROBE("tcp/", tcp_receive_reset, tcp_reset_args){
 	call_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP);
 
 }
+#endif
 
 
 
