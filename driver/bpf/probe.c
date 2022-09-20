@@ -324,21 +324,21 @@ BPF_PROBE("net/", netif_receive_skb, netif_receive_skb_args)
 }
 */
 
-//BPF_KPROBE(tcp_drop)
-//{
-//	struct sysdig_bpf_settings *settings;
-//	enum ppm_event_type evt_type;
-//	settings = get_bpf_settings();
-//	if (!settings)
-//		return 0;
-//
-//	evt_type = PPME_TCP_DROP_E;
-//	if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-//		bpf_tcp_drop_kprobe_e(ctx);
-//	}
-//
-//	return 0;
-//}
+BPF_KPROBE(tcp_drop)
+{
+	struct sysdig_bpf_settings *settings;
+	enum ppm_event_type evt_type;
+	settings = get_bpf_settings();
+	if (!settings)
+		return 0;
+
+	evt_type = PPME_TCP_DROP_E;
+	if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
+		bpf_tcp_drop_kprobe_e(ctx);
+	}
+
+	return 0;
+}
 
 BPF_KPROBE(tcp_rcv_established)
 {
