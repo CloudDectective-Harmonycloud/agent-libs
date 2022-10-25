@@ -2734,9 +2734,6 @@ bool put_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t tid, uint64_t vtid)
 }
 
 uint64_t get_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t vtid){
-	if(vtid>=4096){
-		return 0;
-	}
 	uint64_t pid_vtid = pid<<32 | (vtid & 0xFFFFFFFF);
 	int32_t uth_status = SCAP_SUCCESS;
 	pid_vtid_info *pvi;
