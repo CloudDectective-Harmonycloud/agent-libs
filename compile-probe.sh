@@ -30,6 +30,10 @@ compilerKernelModulesFun() {
 }
 
 for version in $(ls /lib/modules); do
+  if [[ ${ENV_HEADER_VERSION} ]] && [[ ${version} != ${ENV_HEADER_VERSION} ]]; then
+    echo "linux-headers-${version} does not need to be build";
+    continue
+  fi
   array=(${version//./ })
   version3=${array[2]}
   if [[ ${array[2]} =~ "-" ]]; then
