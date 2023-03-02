@@ -1,0 +1,65 @@
+name: Driver build for deploy
+
+on:
+  # Add trigger
+  workflow_dispatch:
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.KEY_ONE }}
+      
+      - name: Build and Package
+        env:
+          HOSTS: ${{ secrets.HOSTS }}
+        run: |
+          # Add the host key
+          echo ${{ secrets.HOST_KEY_ONE }} >> ~/.ssh/known_hosts
+          echo ${{ secrets.HOST_KEY_TWO }} >> ~/.ssh/known_hosts
+          
+          # Build
+          wget https://github.com/KindlingProject/agent-libs/archive/${GITHUB_SHA}.tar.gz -O /tmp/agent-libs-${GITHUB_SHA}.tar.gz
+          for HOST in $HOSTS; do
+          {
+            echo "scp agent-libs.tar.gz"
+            scp /tmp/agent-libs-${GITHUB_SHA}.tar.gz $HOST:/tmp
+            ssh "$HOST" << EOF
+            cd /tmp
+            echo "unzip agent-libs..."
+            tar -zvxf agent-libs-${GITHUB_SHA}.tar.gz
+            sed -i 's/\/lib\/modules\/\$version\/build/\/usr\/src\/kernels\/\$version/g' /tmp/agent-libs-${GITHUB_SHA}/compile-probe.sh
+            sed -i 's/\/lib\/modules/\/usr\/src\/kernels/g' /tmp/agent-libs-${GITHUB_SHA}/compile-probe.sh
+            echo "Compile kindling-drivers..."
+            docker run --rm -v /usr:/host/usr -v /lib/modules:/host/lib/modules -v /tmp/agent-libs-${GITHUB_SHA}:/source kindlingproject/kernel-builder:latest
+          EOF
+          }&
+          done
+          wait
+          
+          # Copy and package
+          rm -rf /tmp/kindling-falcolib-probe && mkdir /tmp/kindling-falcolib-probe
+          for HOST in $HOSTS; do
+            scp -i /root/.ssh/github_public_id_rsa $HOST:/tmp/agent-libs-${GITHUB_SHA}/kindling-falcolib-probe/* /tmp/kindling-falcolib-probe/
+          done
+
+          tar -cvzf /tmp/kindling-falcolib-probe.tar.gz /tmp/kindling-falcolib-probe/
+
+          # Check version
+          ls -a /tmp/kindling-falcolib-probe/
+          
+          # Clean up on remote
+          for HOST in $HOSTS; do
+            ssh "$HOST" << EOF
+            rm -rf /tmp/agent-libs-${GITHUB_SHA}*
+          EOF
+          done
+
+      - uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint: "oss-cn-hangzhou.aliyuncs.com"
+          access-key-id: ${{ secrets.AK }}
+          access-key-secret: ${{ secrets.AS }}
+      - run: ossutil cp -rf /tmp/kindling-falcolib-probe.tar.gz oss://k8s-bpf-probes-public/kindling-falcolib-probe-latest.tar.gz

@@ -1,22 +1,15 @@
-name: Driver build
+name: Driver build for test
 
 on:
-#   push:
-#     branches:
-#     - main
+  pull_request_review:
+    types: [submitted]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-test:
+    if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Node.js 16.x
-        uses: actions/setup-node@v2
-        with:
-          node-version: 16.x
-        
       - uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.KEY_ONE }}
@@ -29,7 +22,7 @@ jobs:
           echo ${{ secrets.HOST_KEY_ONE }} >> ~/.ssh/known_hosts
           echo ${{ secrets.HOST_KEY_TWO }} >> ~/.ssh/known_hosts
           
-          # build
+          # Build
           wget https://github.com/KindlingProject/agent-libs/archive/${GITHUB_SHA}.tar.gz -O /tmp/agent-libs-${GITHUB_SHA}.tar.gz
           for HOST in $HOSTS; do
           {
@@ -48,7 +41,7 @@ jobs:
           done
           wait
           
-          # copy and package
+          # Copy and package
           rm -rf /tmp/kindling-falcolib-probe && mkdir /tmp/kindling-falcolib-probe
           for HOST in $HOSTS; do
             scp -i /root/.ssh/github_public_id_rsa $HOST:/tmp/agent-libs-${GITHUB_SHA}/kindling-falcolib-probe/* /tmp/kindling-falcolib-probe/
@@ -56,10 +49,10 @@ jobs:
 
           tar -cvzf /tmp/kindling-falcolib-probe.tar.gz /tmp/kindling-falcolib-probe/
 
-          # check version
+          # Check version
           ls -a /tmp/kindling-falcolib-probe/
           
-          # clean up
+          # Clean up on remote
           for HOST in $HOSTS; do
             ssh "$HOST" << EOF
             rm -rf /tmp/agent-libs-${GITHUB_SHA}*
