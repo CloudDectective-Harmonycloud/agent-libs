@@ -13,6 +13,9 @@ inputs:
   host_key_two:
     description: host key two
     required: true
+  mode:
+    description: build mode
+    required: true
 
 runs:
   using: "composite"
@@ -26,25 +29,32 @@ runs:
       shell: bash
       env:
         HOSTS: ${{ inputs.hosts }}
+        REMOTE_LIB_ABS_DIR: /tmp
       run: |
         # Add the host key
         echo ${{ inputs.host_key_one }} >> ~/.ssh/known_hosts
         echo ${{ inputs.host_key_two }} >> ~/.ssh/known_hosts
         
+        # Set env
+        export LIB_NAME=agent-libs-${{ github.sha }}-${{ inputs.mode }}
+        export LIB_TAR_NAME=${LIB_NAME}.tar.gz
+        export REMOTE_LIB_ABS_PATH=${REMOTE_LIB_ABS_DIR}/${LIB_NAME}
+        export REMOTE_LIB_TAR_ABS_PATH=${REMOTE_LIB_ABS_DIR}/${LIB_TAR_NAME}
+
         # Build
-        wget https://github.com/KindlingProject/agent-libs/archive/${GITHUB_SHA}.tar.gz -O /tmp/agent-libs-${GITHUB_SHA}.tar.gz
+        tar -czvf ${LIB_TAR_NAME} ./*
         for HOST in $HOSTS; do
         {
           echo "scp agent-libs.tar.gz"
-          scp /tmp/agent-libs-${GITHUB_SHA}.tar.gz $HOST:/tmp
+          scp ${LIB_TAR_NAME} $HOST:${REMOTE_LIB_TAR_ABS_PATH}
           ssh "$HOST" << EOF
-          cd /tmp
           echo "unzip agent-libs..."
-          tar -zvxf agent-libs-${GITHUB_SHA}.tar.gz
-          sed -i 's/\/lib\/modules\/\$version\/build/\/usr\/src\/kernels\/\$version/g' /tmp/agent-libs-${GITHUB_SHA}/compile-probe.sh
-          sed -i 's/\/lib\/modules/\/usr\/src\/kernels/g' /tmp/agent-libs-${GITHUB_SHA}/compile-probe.sh
+          mkdir -p ${REMOTE_LIB_ABS_PATH}
+          tar -zvxf ${REMOTE_LIB_TAR_ABS_PATH} -C ${REMOTE_LIB_ABS_PATH}
+          sed -i 's/\/lib\/modules\/\$version\/build/\/usr\/src\/kernels\/\$version/g' ${REMOTE_LIB_ABS_PATH}/compile-probe.sh
+          sed -i 's/\/lib\/modules/\/usr\/src\/kernels/g' ${REMOTE_LIB_ABS_PATH}/compile-probe.sh
           echo "Compile kindling-drivers..."
-          docker run --rm -v /usr:/host/usr -v /lib/modules:/host/lib/modules -v /tmp/agent-libs-${GITHUB_SHA}:/source kindlingproject/kernel-builder:latest
+          docker run --rm -v /usr:/host/usr -v /lib/modules:/host/lib/modules -v ${REMOTE_LIB_ABS_PATH}:/source kindlingproject/kernel-builder:latest
         EOF
         }&
         done
@@ -53,7 +63,7 @@ runs:
         # Copy and package
         rm -rf /tmp/kindling-falcolib-probe && mkdir /tmp/kindling-falcolib-probe
         for HOST in $HOSTS; do
-          scp -i /root/.ssh/github_public_id_rsa $HOST:/tmp/agent-libs-${GITHUB_SHA}/kindling-falcolib-probe/* /tmp/kindling-falcolib-probe/
+          scp $HOST:${REMOTE_LIB_ABS_PATH}/kindling-falcolib-probe/* /tmp/kindling-falcolib-probe/
         done
 
         tar -cvzf /tmp/kindling-falcolib-probe.tar.gz /tmp/kindling-falcolib-probe/
@@ -64,6 +74,6 @@ runs:
         # Clean up on remote
         for HOST in $HOSTS; do
           ssh "$HOST" << EOF
-          rm -rf /tmp/agent-libs-${GITHUB_SHA}*
+          rm -rf ${REMOTE_LIB_ABS_PATH}*
         EOF
         done

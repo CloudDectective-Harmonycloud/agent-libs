@@ -19,3 +19,4 @@ jobs:
           hosts: ${{ secrets.HOSTS }}
           host_key_one: ${{ secrets.HOST_KEY_ONE }}
           host_key_two: ${{ secrets.HOST_KEY_TWO }}
+          mode: "test"
