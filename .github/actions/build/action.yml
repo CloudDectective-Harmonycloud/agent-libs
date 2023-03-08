@@ -66,7 +66,7 @@ runs:
           scp $HOST:${REMOTE_LIB_ABS_PATH}/kindling-falcolib-probe/* /tmp/kindling-falcolib-probe/
         done
 
-        tar -cvzf /tmp/kindling-falcolib-probe.tar.gz /tmp/kindling-falcolib-probe/
+        tar -cvzf /tmp/kindling-falcolib-probe.tar.gz -C /tmp kindling-falcolib-probe
 
         # Check version
         ls -a /tmp/kindling-falcolib-probe/
