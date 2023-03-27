@@ -25,7 +25,7 @@ runs:
       with:
         ssh-private-key: ${{ inputs.ssh_key }}
 
-    - name: Build and Package
+    - name: Build
       shell: bash
       env:
         HOSTS: ${{ inputs.hosts }}
@@ -42,6 +42,7 @@ runs:
         export REMOTE_LIB_TAR_ABS_PATH=${REMOTE_LIB_ABS_DIR}/${LIB_TAR_NAME}
 
         # Build
+        echo "Start building"
         tar -czvf ${LIB_TAR_NAME} ./*
         for HOST in $HOSTS; do
         {
@@ -59,21 +60,26 @@ runs:
         }&
         done
         wait
-        
-        # Copy and package
+        echo "Build successfully"
+
+        # Copy
+        echo "Start copying to local"
         rm -rf /tmp/kindling-falcolib-probe && mkdir /tmp/kindling-falcolib-probe
         for HOST in $HOSTS; do
+        {
           scp $HOST:${REMOTE_LIB_ABS_PATH}/kindling-falcolib-probe/* /tmp/kindling-falcolib-probe/
+        }&
         done
+        wait
+        echo "Copy successfully"
 
-        tar -cvzf /tmp/kindling-falcolib-probe.tar.gz -C /tmp kindling-falcolib-probe
-
-        # Check version
-        ls -a /tmp/kindling-falcolib-probe/
-        
         # Clean up on remote
+        echo "Clean up on remote"
         for HOST in $HOSTS; do
+        {
           ssh "$HOST" << EOF
           rm -rf ${REMOTE_LIB_ABS_PATH}*
         EOF
+        }&
         done
+        wait

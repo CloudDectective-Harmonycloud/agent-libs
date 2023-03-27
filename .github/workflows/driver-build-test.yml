@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Build and Package
+      - name: Build and Copy to local
         uses: ./.github/actions/build
         with:
           ssh_key: ${{ secrets.KEY_ONE }}
@@ -20,3 +20,8 @@ jobs:
           host_key_one: ${{ secrets.HOST_KEY_ONE }}
           host_key_two: ${{ secrets.HOST_KEY_TWO }}
           mode: "test"
+
+      - name: Check version
+        shell: bash
+        run: |
+          ls -a /tmp/kindling-falcolib-probe/
