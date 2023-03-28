@@ -12,7 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Build and Copy to local
+      - name: Build and Fetch results
+        id: build
         uses: ./.github/actions/build
         with:
           ssh_key: ${{ secrets.KEY_ONE }}
@@ -24,23 +25,23 @@ jobs:
       - name: Check version
         shell: bash
         run: |
-          cd /tmp/kindling-falcolib-probe  
+          drivers=${{ steps.build.outputs.drivers }}
           # Checking .ko
-          for version in ${{ vars.CHECKLIST_KO }};
-          do
+          for version in ${{ vars.CHECKLIST_KO }}; do
           {
             echo "Checking $version.ko"
-            if [ ! -f $version.ko ]; then
+            if ! [[ $drivers =~ $version.ko ]]; then
+              echo "Failed to check $version.ko"
               exit 1
             fi
           }
           done
           # Checking .o
-          for file in ${{ vars.CHECKLIST_O }};
-          do
+          for version in ${{ vars.CHECKLIST_O }}; do
           {
             echo "Checking $version.o"
-            if [ ! -f $version.o ]; then
+            if ! [[ $drivers =~ $version.o ]]; then
+              echo "Failed to check $version.o"
               exit 1
             fi
           }
