@@ -24,4 +24,25 @@ jobs:
       - name: Check version
         shell: bash
         run: |
-          ls -a /tmp/kindling-falcolib-probe/
+          cd /tmp/kindling-falcolib-probe  
+          # Checking .ko
+          for version in ${{ vars.CHECKLIST_KO }};
+          do
+          {
+            echo "Checking $version.ko"
+            if [ ! -f $version.ko ]; then
+              exit 1
+            fi
+          }
+          done
+          # Checking .o
+          for file in ${{ vars.CHECKLIST_O }};
+          do
+          {
+            echo "Checking $version.o"
+            if [ ! -f $version.o ]; then
+              exit 1
+            fi
+          }
+          done
+          echo "Pass test"
