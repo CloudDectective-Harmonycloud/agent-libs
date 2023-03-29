@@ -2717,20 +2717,20 @@ int32_t scap_disable_skb_capture(scap_t *handle)
 #endif
 }
 
-bool put_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t tid, uint64_t vtid){
-	int32_t uth_status = SCAP_SUCCESS;
-	pid_vtid_info *pvi;
-	HASH_FIND_INT64(handle->m_pid_vtid_info, &pid, pvi);
-	if(pvi==NULL){
-		pvi = (struct pid_vtid_info*)malloc(sizeof(pid_vtid_info));
-		pvi->pid_vtid = pid<<32 | (vtid & 0xFFFFFFFF);
-		pvi->tid = tid;
-		uth_status = SCAP_SUCCESS;
-		HASH_ADD_INT64(handle->m_pid_vtid_info, pid_vtid, pvi);
-	}else {
-		pvi->tid = tid;
+void delete_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t tid){
+	uint64_t vtid = get_tid_vtid_map(handle, tid);
+	if(vtid == 0){
+		return ;
 	}
-	return true;
+	printf("delete pid vtid map\n");
+	uint64_t pid_vtid = pid<<32 | (vtid & 0xFFFFFFFF);
+	pid_vtid_info *pvi;
+	HASH_FIND_INT64(handle->m_pid_vtid_info, &pid_vtid, pvi);
+	if(pvi!=NULL){
+		HASH_DEL(handle->m_pid_vtid_info, pvi);
+		free(pvi);
+	}
+	delete_tid_vtid_map(handle, tid);
 }
 
 uint64_t get_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t vtid){
@@ -2740,6 +2740,59 @@ uint64_t get_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t vtid){
 	HASH_FIND_INT64(handle->m_pid_vtid_info, &pid_vtid, pvi);
 	if(pvi!=NULL){
 		return pvi->tid;
+	}else{
+		return 0;
+	}
+}
+
+bool put_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t tid, uint64_t vtid){
+	int32_t uth_status = SCAP_SUCCESS;
+	pid_vtid_info *pvi;
+	uint64_t pid_vtid = pid<<32 | (vtid & 0xFFFFFFFF);
+	HASH_FIND_INT64(handle->m_pid_vtid_info, &pid_vtid, pvi);
+	if(pvi==NULL){
+		pvi = (struct pid_vtid_info*)malloc(sizeof(pid_vtid_info));
+		pvi->pid_vtid = pid_vtid;
+		pvi->tid = tid;
+		uth_status = SCAP_SUCCESS;
+		HASH_ADD_INT64(handle->m_pid_vtid_info, pid_vtid, pvi);
+	}else {
+		pvi->tid = tid;
+	}
+	put_tid_vtid_map(handle, tid, vtid);
+	return true;
+}
+
+bool put_tid_vtid_map(scap_t *handle, uint64_t tid, uint64_t vtid){
+	int32_t uth_status = SCAP_SUCCESS;
+	tid_vtid_info *tvi;
+	HASH_FIND_INT64(handle->m_tid_vtid_info, &tid, tvi);
+	if(tvi==NULL){
+		tvi = (struct tid_vtid_info*)malloc(sizeof(tid_vtid_info));
+		tvi->vtid = vtid;
+		uth_status = SCAP_SUCCESS;
+		HASH_ADD_INT64(handle->m_tid_vtid_info, tid, tvi);
+	}else {
+		tvi->vtid = vtid;
+	}
+	return true;
+}
+
+void delete_tid_vtid_map(scap_t *handle, uint64_t tid){
+	tid_vtid_info *tvi;
+	HASH_FIND_INT64(handle->m_tid_vtid_info, &tid, tvi);
+	if(tvi!=NULL){
+		HASH_DEL(handle->m_tid_vtid_info, tvi);
+		free(tvi);
+	}
+}
+
+uint64_t get_tid_vtid_map(scap_t *handle,uint64_t tid){
+	int32_t uth_status = SCAP_SUCCESS;
+	tid_vtid_info *tvi;
+	HASH_FIND_INT64(handle->m_tid_vtid_info, &tid, tvi);
+	if(tvi!=NULL){
+		return tvi->vtid;
 	}else{
 		return 0;
 	}
