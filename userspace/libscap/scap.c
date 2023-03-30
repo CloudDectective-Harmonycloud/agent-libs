@@ -728,6 +728,7 @@ scap_t* scap_open_offline_int(gzFile gzfile,
 	handle->m_suppressed_comms = NULL;
 	handle->m_suppressed_tids = NULL;
 	handle->m_pid_vtid_info = NULL;
+	handle->m_tid_vtid_info = NULL;
 
 	handle->m_file_evt_buf = (char*)malloc(FILE_READ_BUF_SIZE);
 	if(!handle->m_file_evt_buf)
@@ -2722,7 +2723,6 @@ void delete_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t tid){
 	if(vtid == 0){
 		return ;
 	}
-	printf("delete pid vtid map\n");
 	uint64_t pid_vtid = pid<<32 | (vtid & 0xFFFFFFFF);
 	pid_vtid_info *pvi;
 	HASH_FIND_INT64(handle->m_pid_vtid_info, &pid_vtid, pvi);
@@ -2770,6 +2770,7 @@ bool put_tid_vtid_map(scap_t *handle, uint64_t tid, uint64_t vtid){
 	if(tvi==NULL){
 		tvi = (struct tid_vtid_info*)malloc(sizeof(tid_vtid_info));
 		tvi->vtid = vtid;
+		tvi->tid = tid;
 		uth_status = SCAP_SUCCESS;
 		HASH_ADD_INT64(handle->m_tid_vtid_info, tid, tvi);
 	}else {
@@ -2788,7 +2789,6 @@ void delete_tid_vtid_map(scap_t *handle, uint64_t tid){
 }
 
 uint64_t get_tid_vtid_map(scap_t *handle,uint64_t tid){
-	int32_t uth_status = SCAP_SUCCESS;
 	tid_vtid_info *tvi;
 	HASH_FIND_INT64(handle->m_tid_vtid_info, &tid, tvi);
 	if(tvi!=NULL){
