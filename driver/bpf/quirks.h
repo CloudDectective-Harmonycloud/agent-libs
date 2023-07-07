@@ -12,7 +12,7 @@ or GPL2.txt for full copies of the license.
 #include <linux/version.h>
 #include "../ppm_version.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && LINUX_VERSION_CODE != KERNEL_VERSION(4, 12, 14))
 #if (PPM_RHEL_RELEASE_CODE > 0 && PPM_RHEL_RELEASE_CODE >= PPM_RHEL_RELEASE_VERSION(7, 6) && PPM_RHEL_RELEASE_CODE < PPM_RHEL_RELEASE_VERSION(8, 0))
 #else
 #error Kernel version must be >= 4.14 with eBPF enabled

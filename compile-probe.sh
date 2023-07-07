@@ -61,6 +61,9 @@ for version in $(ls /lib/modules); do
   if [ ${array[0]} -ge 5 ]; then
     compilerBpfFun
   fi
+  if [ ${array[0]} -ge 4 ] && [ ${array[1]} == "12" ] && [ ${array[2]} == "14-120" ]; then
+    compilerBpfFun
+  fi
   if [ ${array[0]} -ge 4 ] && [ ${array[1]} -ge 14 ]; then
     compilerBpfFun
   fi

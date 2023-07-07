@@ -1145,6 +1145,8 @@ static __always_inline bool bpf_in_ia32_syscall()
 
 #if (PPM_RHEL_RELEASE_CODE > 0 && PPM_RHEL_RELEASE_CODE >= PPM_RHEL_RELEASE_VERSION(7, 6) && PPM_RHEL_RELEASE_CODE < PPM_RHEL_RELEASE_VERSION(8, 0))
     return 0;
+#elif LINUX_VERSION_CODE == KERNEL_VERSION(4, 12, 14)
+	status = _READ(task->thread_info.status);
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 18)
 	status = _READ(task->thread.status);
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
