@@ -218,7 +218,11 @@ BPF_PROBE("sched/", sched_switch, sched_switch_args)
 #else
 BPF_KPROBE(finish_task_switch)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
+	struct task_struct *p = (struct task_struct *) ctx->di;
+#else
 	struct task_struct *p = (struct task_struct *) ctx->si;
+#endif
 	struct task_struct *n = (struct task_struct *) bpf_get_current_task();
 #endif
 	struct sysdig_bpf_settings *settings;
