@@ -460,7 +460,6 @@ static __always_inline int init_filler_data(void *ctx,
 					    bool is_syscall)
 {
 	unsigned int cpu;
-
 	data->ctx = ctx;
 
 	data->settings = get_bpf_settings();
@@ -632,6 +631,11 @@ static __always_inline void call_filler(void *ctx,
 		return;
 	}
 
+	pid = bpf_get_current_pid_tgid()>> 32;
+	if(settings->kindling_mod_count !=0 && settings->kindling_mod_number !=0 && (pid % settings->kindling_mod_count + 1) != settings->kindling_mod_number){
+		return;
+	}
+
 	cpu = bpf_get_smp_processor_id();
 
 	state = get_local_state(cpu);
@@ -679,6 +683,11 @@ static __always_inline bool prepare_filler(void *ctx,
 	unsigned long long pid;
 	unsigned long long ts;
 	unsigned int cpu;
+
+	pid = bpf_get_current_pid_tgid()>> 32;
+	if(!settings->events_modify[evt_type] && settings->kindling_mod_count != 0 && settings->kindling_mod_number !=0 && settings->kindling_mod_number != 1){
+		return false;
+	}
 
 	if (evt_type < PPM_EVENT_MAX && !settings->events_mask[evt_type]) {
 		return false;

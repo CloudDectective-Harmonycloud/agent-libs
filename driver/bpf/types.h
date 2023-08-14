@@ -285,6 +285,11 @@ struct sysdig_bpf_settings {
 	uint16_t switch_agg_num;
 	char if_name[16];
 	bool events_mask[PPM_EVENT_MAX];
+	bool events_modify[PPM_EVENT_MAX];
+
+	uint64_t kindling_mod_count;
+	uint64_t kindling_mod_number;
+	
 } __attribute__((packed));
 
 struct tail_context {

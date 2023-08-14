@@ -257,7 +257,7 @@ BPF_KPROBE(finish_task_switch)
 		}
 		// record enqueue time
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
-		if (_READ(p->__state) == TASK_RUNNING) {
+		if (_READ(p->state) == TASK_RUNNING) {
 #else	
 		if (_READ(p->state) == TASK_RUNNING) {	
 #endif	

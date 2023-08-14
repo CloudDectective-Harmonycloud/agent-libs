@@ -1446,6 +1446,16 @@ static int32_t set_default_settings(scap_t *handle)
 	settings.fullcapture_port_range_start = 0;
 	settings.fullcapture_port_range_end = 0;
 	settings.statsd_port = 8125;
+	char* kindling_mod_count_str = getenv("kindling_mod_count");
+	if (kindling_mod_count_str != NULL)
+	{
+		settings.kindling_mod_count = atoi(kindling_mod_count_str);
+	}
+	char* kindling_mod_number_str = getenv("kindling_mod_number");
+	if (kindling_mod_number_str != NULL)
+	{
+		settings.kindling_mod_number = atoi(kindling_mod_number_str);
+	}
 	char* tmp_num = getenv("switch_agg_num");
 	if (tmp_num != NULL)
 	{

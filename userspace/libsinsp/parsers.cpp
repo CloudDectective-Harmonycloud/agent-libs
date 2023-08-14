@@ -1155,34 +1155,34 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	if(valid_parent)
 	{
 		// Copy the command name from the parent
-		tinfo->m_comm = ptinfo->m_comm;
+		//tinfo->m_comm = ptinfo->m_comm;
 
 		// Copy the full executable name from the parent
-		tinfo->m_exe = ptinfo->m_exe;
+		// tinfo->m_exe = ptinfo->m_exe;
 
 		// Copy the full executable path from the parent
-		tinfo->m_exepath = ptinfo->m_exepath;
+		// tinfo->m_exepath = ptinfo->m_exepath;
 
 		// Copy the command arguments from the parent
-		tinfo->m_args = ptinfo->m_args;
+		// tinfo->m_args = ptinfo->m_args;
 
 		// Copy the root from the parent
-		tinfo->m_root = ptinfo->m_root;
+		// tinfo->m_root = ptinfo->m_root;
 
 		// Copy the session id from the parent
-		tinfo->m_sid = ptinfo->m_sid;
+		// tinfo->m_sid = ptinfo->m_sid;
 
 		// Copy the process group id from the parent
-		tinfo->m_vpgid = ptinfo->m_vpgid;
+		// tinfo->m_vpgid = ptinfo->m_vpgid;
 
-		tinfo->m_tty = ptinfo->m_tty;
+		// tinfo->m_tty = ptinfo->m_tty;
 
-		tinfo->m_loginuid = ptinfo->m_loginuid;
+		// tinfo->m_loginuid = ptinfo->m_loginuid;
 
-		if(!(flags & PPM_CL_CLONE_THREAD))
-		{
-			tinfo->m_env = ptinfo->m_env;
-		}
+		// if(!(flags & PPM_CL_CLONE_THREAD))
+		// {
+		//	tinfo->m_env = ptinfo->m_env;
+		// }
 	}
 	else
 	{
