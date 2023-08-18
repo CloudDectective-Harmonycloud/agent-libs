@@ -182,7 +182,7 @@ static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_b
 {
 	uint16_t switch_agg_num = settings->switch_agg_num;
 	struct info_t *infop = get_cpu_info(pid, tid, start_ts);
-
+	bool is_print = false;
 	if (infop != 0) {
 		if (infop->index < switch_agg_num) {
 			infop->times_specs[infop->index & (NUM - 1)] = delta;
@@ -197,6 +197,11 @@ static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_b
 		if (focus_time) {
 		 	if (*focus_time > start_ts && *focus_time < start_ts + delta) have_focus_events = true;
 		}
+		if(settings->cpu_analyzer_debug && settings->cpu_analyzer_debug_pid == pid && (settings->cpu_analyzer_debug_tid == tid || tid == 0))
+		{
+			is_print = true;
+			bpf_printk_cpu_analyzer("pre record, pid: %d , tid: %d , focus time: %llu, start time: %llu \n", pid, tid, focus_time, start_ts);
+		}
 
 		/* Some situations will trigger perf out:
 		   1. have focused events, e.g. net events
@@ -205,6 +210,10 @@ static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_b
 		*/
 		if (infop->index > 0 && (have_focus_events
 			|| infop->index == switch_agg_num || infop->index == switch_agg_num - 1 || offset_ts > 2000000000)) {
+			if(is_print)
+			{
+				bpf_printk_cpu_analyzer("record out, pid: %d , tid: %d\n", pid, tid);
+			}
 			// perf out
 			if (prepare_filler(ctx, ctx, PPME_CPU_ANALYSIS_E, settings, 0)) {
 				bpf_cpu_analysis(ctx, infop->tid);

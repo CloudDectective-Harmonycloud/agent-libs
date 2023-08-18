@@ -8,7 +8,7 @@ or GPL2.txt for full copies of the license.
 */
 #pragma once
 
-#define PROBE_VERSION "0.1.1dev"
+#define PROBE_VERSION ""
 
 #define PROBE_NAME "kindling-falcolib-probe"
 
