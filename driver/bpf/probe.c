@@ -233,13 +233,17 @@ BPF_KPROBE(finish_task_switch)
 
 	if (evt_type < PPM_EVENT_MAX && !settings->events_mask[evt_type])
 		return 0;
-
+	u64 ts, *tsp;
+	ts = bpf_ktime_get_ns();
 	u32 tid = _READ(p->pid);
 	u32 pid = _READ(p->tgid);
-	u64 ts, *tsp;
+	bool is_print = false;
+	if(settings->cpu_analyzer_debug && settings->cpu_analyzer_debug_pid == pid && (settings->cpu_analyzer_debug_tid == tid || tid == 0)) {
+		bpf_printk_cpu_analyzer("start off, pid: %d , tid: %d", pid, tid);
+	}
+
 	if (FILTER) {
 		// record previous thread offcpu start time
-		ts = bpf_ktime_get_ns();
 		bpf_map_update_elem(&off_start_ts, &tid, &ts, BPF_ANY);
 
 		u64 *on_ts;
@@ -273,8 +277,10 @@ BPF_KPROBE(finish_task_switch)
 
 	// record next thread's oncpu start time
 	u64 on_ts = bpf_ktime_get_ns();
-	bpf_map_update_elem(&on_start_ts, &tid, &on_ts, BPF_ANY);
-
+	int res = bpf_map_update_elem(&on_start_ts, &tid, &on_ts, BPF_ANY);
+	if(settings->cpu_analyzer_debug && settings->cpu_analyzer_debug_pid == pid && (settings->cpu_analyzer_debug_tid == tid || tid == 0)) {
+		bpf_printk_cpu_analyzer("start on, pid: %d , tid: %d, on_ts: %llu \n", pid, tid, on_ts);
+	}
 	tsp = bpf_map_lookup_elem(&off_start_ts, &tid);
 	if (tsp != 0) {
 		u64 off_ts = *tsp;
@@ -294,6 +300,10 @@ BPF_KPROBE(finish_task_switch)
 				record_cpu_offtime(ctx, settings, pid, tid, off_ts, rq_la, delta);
 			}
 		}
+	} else {
+		pid_t vtid;
+		vtid = bpf_task_pid_vnr(n);
+		bpf_map_update_elem(&tid_vtid, &tid, &vtid, BPF_ANY);
 	}
 
 	return 0;

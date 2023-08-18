@@ -189,13 +189,20 @@ struct bpf_map_def __bpf_section("maps") cpu_records = {
         .type = BPF_MAP_TYPE_HASH,
         .key_size = sizeof(u32),
         .value_size = sizeof(struct info_t),
-        .max_entries = 1000,
+        .max_entries = 65536,
 };
 
 struct bpf_map_def __bpf_section("maps") cpu_focus_threads = {
         .type = BPF_MAP_TYPE_HASH,
         .key_size = sizeof(u32),
         .value_size = sizeof(u64),
+        .max_entries = 65535,
+};
+
+struct bpf_map_def __bpf_section("maps") tid_vtid = {
+        .type = BPF_MAP_TYPE_HASH,
+        .key_size = sizeof(u32),
+        .value_size = sizeof(pid_t),
         .max_entries = 65535,
 };
 #endif // __KERNEL__

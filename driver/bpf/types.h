@@ -285,6 +285,9 @@ struct sysdig_bpf_settings {
 	uint16_t switch_agg_num;
 	char if_name[16];
 	bool events_mask[PPM_EVENT_MAX];
+	bool cpu_analyzer_debug;
+	uint64_t cpu_analyzer_debug_pid;
+	uint64_t cpu_analyzer_debug_tid;
 } __attribute__((packed));
 
 struct tail_context {

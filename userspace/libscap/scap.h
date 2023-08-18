@@ -1077,6 +1077,7 @@ int32_t scap_enable_tracers_capture(scap_t* handle);
 int32_t scap_enable_page_faults(scap_t *handle);
 int32_t scap_enable_skb_capture(scap_t *handle);
 int32_t scap_disable_skb_capture(scap_t *handle);
+int32_t scap_update_cpu_debug(scap_t *handle, uint64_t debug_pid, uint64_t debug_tid, bool open);
 uint64_t scap_get_unexpected_block_readsize(scap_t* handle);
 int32_t scap_proc_add(scap_t* handle, uint64_t tid, scap_threadinfo* tinfo);
 int32_t scap_fd_add(scap_t *handle, scap_threadinfo* tinfo, uint64_t fd, scap_fdinfo* fdinfo);

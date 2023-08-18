@@ -2797,3 +2797,26 @@ uint64_t get_tid_vtid_map(scap_t *handle,uint64_t tid){
 		return 0;
 	}
 }
+
+int32_t scap_update_cpu_debug(scap_t *handle, uint64_t debug_pid, uint64_t debug_tid, bool open)
+{
+	//
+	// Not supported on files
+	//
+	if(handle->m_mode != SCAP_MODE_LIVE)
+	{
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "cpu debug not supported on this scap mode");
+		return SCAP_FAILURE;
+	}
+
+	if(handle->m_bpf)
+	{
+
+		return scap_bpf_update_cpu_debug(handle, debug_pid, debug_tid, open);
+	}
+	else
+	{
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "skb capture not supported on kernel module");
+		return SCAP_FAILURE;
+	}
+}

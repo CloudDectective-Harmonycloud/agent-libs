@@ -792,6 +792,8 @@ public:
 	*/
 	void unset_eventmask(uint32_t event_id);
 
+	void update_cpu_debug(uint64_t debug_pid, uint64_t debug_tid, bool open);
+
 	/*!
 	  \brief When reading events from a trace file, this function returns the
 	   read progress as a number between 0 and 100.

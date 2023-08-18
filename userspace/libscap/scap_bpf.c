@@ -1757,3 +1757,26 @@ int32_t scap_bpf_handle_eventmask(scap_t* handle, uint32_t op, uint32_t event_id
 
 	return SCAP_SUCCESS;
 }
+
+int32_t scap_bpf_update_cpu_debug(scap_t *handle, uint64_t debug_pid, uint64_t debug_tid, bool open)
+{
+	struct sysdig_bpf_settings settings;
+	int k = 0;
+
+	if(bpf_map_lookup_elem(handle->m_bpf_map_fds[SYSDIG_SETTINGS_MAP], &k, &settings) != 0)
+	{
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "SYSDIG_SETTINGS_MAP bpf_map_lookup_elem < 0");
+		return SCAP_FAILURE;
+	}
+
+	settings.cpu_analyzer_debug = open;
+	settings.cpu_analyzer_debug_pid = debug_pid;
+	settings.cpu_analyzer_debug_tid = debug_tid;
+	if(bpf_map_update_elem(handle->m_bpf_map_fds[SYSDIG_SETTINGS_MAP], &k, &settings, BPF_ANY) != 0)
+	{
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "SYSDIG_SETTINGS_MAP bpf_map_update_elem < 0");
+		return SCAP_FAILURE;
+	}
+
+	return SCAP_SUCCESS;
+}

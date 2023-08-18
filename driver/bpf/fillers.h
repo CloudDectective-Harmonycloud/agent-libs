@@ -5154,7 +5154,8 @@ FILLER(tcp_receive_reset_e, false)
 		return res;
 	return 0;
 }
-static __always_inline int __bpf_cpu_analysis(struct filler_data *data, u32 tid)
+
+static __always_inline int __bpf_cpu_analysis(struct filler_data *data, u32 tid, pid_t vtid)
 {
     int res;
     struct info_t *infop = bpf_map_lookup_elem(&cpu_records, &tid);
@@ -5183,6 +5184,8 @@ static __always_inline int __bpf_cpu_analysis(struct filler_data *data, u32 tid)
     data->curarg_already_on_frame = true;
     res = bpf_val_to_ring_len(data, 0, size);
 
+    res = bpf_val_to_ring_type(data, vtid, PT_PID);
+
     return 0;
 }
 
@@ -5190,6 +5193,17 @@ static __always_inline int bpf_cpu_analysis(void *ctx, u32 tid)
 {
     struct filler_data data;
     int res;
+	struct task_struct *task;
+
+    pid_t vtid;
+
+	u32 *tsp;
+
+    tsp = bpf_map_lookup_elem(&tid_vtid, &tid);
+	if (tsp != 0) {
+		vtid = *tsp;
+
+	}
 
     res = init_filler_data(ctx, &data, false);
     if (res == PPM_SUCCESS) {
@@ -5201,7 +5215,7 @@ static __always_inline int bpf_cpu_analysis(void *ctx, u32 tid)
         evt_hdr->tid = tid;
     #endif
 
-        res = __bpf_cpu_analysis(&data, tid);
+        res = __bpf_cpu_analysis(&data, tid, vtid);
     }
 
     if (res == PPM_SUCCESS)

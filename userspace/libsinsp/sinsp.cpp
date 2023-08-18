@@ -1951,6 +1951,14 @@ void sinsp::unset_eventmask(uint32_t event_id)
 	}
 }
 
+void sinsp::update_cpu_debug(uint64_t debug_pid, uint64_t debug_tid, bool open)
+{
+	if (scap_update_cpu_debug(m_h, debug_pid, debug_tid, open) != SCAP_SUCCESS)
+	{
+		throw sinsp_exception(scap_getlasterr(m_h));
+	}
+}
+
 void sinsp::protodecoder_register_reset(sinsp_protodecoder* dec)
 {
 	m_decoders_reset_list.push_back(dec);

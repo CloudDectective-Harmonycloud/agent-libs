@@ -354,7 +354,7 @@ const struct ppm_event_info g_event_info[PPM_EVENT_MAX] = {
 	/* PPME_TCP_SEND_RESET_X */{"tcp_send_reset", EC_NET, EF_UNUSED, 0},
 	/* PPME_TCP_RECEIVE_RESET_E */{"tcp_receive_reset", EC_NET, EF_DROP_SIMPLE_CONS | EF_NONE_PARSE, 2, {{"tuple", PT_SOCKTUPLE, PF_NA}, {"state", PT_UINT32, PF_DEC} } },
 	/* PPME_TCP_RECEIVE_RESET_X */{"tcp_send_reset", EC_NET, EF_UNUSED, 0},
-	/* PPME_CPU_ANALYSIS_E */{"cpu_analysis", EC_PROCESS, EF_NONE_PARSE, 6, {{"start_ts", PT_UINT64, PF_DEC}, {"end_ts", PT_UINT64, PF_DEC}, {"cnt", PT_UINT32, PF_DEC}, {"time_specs", PT_BYTEBUF, PF_NA}, {"runq_latency", PT_BYTEBUF, PF_NA}, {"time_type", PT_BYTEBUF, PF_NA}}},
+	/* PPME_CPU_ANALYSIS_E */{"cpu_analysis", EC_PROCESS, EF_NONE_PARSE, 7, {{"start_ts", PT_UINT64, PF_DEC}, {"end_ts", PT_UINT64, PF_DEC}, {"cnt", PT_UINT32, PF_DEC}, {"time_specs", PT_BYTEBUF, PF_NA}, {"runq_latency", PT_BYTEBUF, PF_NA}, {"time_type", PT_BYTEBUF, PF_NA}, {"vtid", PT_PID, PF_DEC}}},
 	/* PPME_CPU_ANALYSIS_X */{"cpu_analysis", EC_PROCESS, EF_UNUSED, 0}
 	/* NB: Starting from scap version 1.2, event types will no longer be changed when an event is modified, and the only kind of change permitted for pre-existent events is adding parameters.
 	 *     New event types are allowed only for new syscalls or new internal events.
