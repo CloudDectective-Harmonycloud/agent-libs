@@ -200,7 +200,7 @@ static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_b
 		if(settings->cpu_analyzer_debug && settings->cpu_analyzer_debug_pid == pid && (settings->cpu_analyzer_debug_tid == tid || tid == 0))
 		{
 			is_print = true;
-			bpf_printk_cpu_analyzer("pre record, pid: %d , tid: %d , focus time: %llu, start time: %llu \n", pid, tid, focus_time, start_ts);
+			bpf_printk_cpu_analyzer("pre record, pid: %d , tid: %d , focus time: %llu \n", pid, tid, focus_time);
 		}
 
 		/* Some situations will trigger perf out:
