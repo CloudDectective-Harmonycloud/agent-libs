@@ -761,7 +761,12 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 			symbols = data;
 		}
 		else if(strcmp(shname, "kernel_version") == 0) {
-			if(strcmp(osname.release, data->d_buf))
+			unsigned major[2], minor[2], patch[2], build[2];
+			if (sscanf(osname.release, "%d.%d.%d-%d", &major[0], &minor[0], &patch[0], &build[0]) != 4)
+				return 0;
+			if (sscanf(data->d_buf, "%d.%d.%d-%d", &major[1], &minor[1], &patch[1], &build[1]) != 4)
+				return 0;
+			if(major[0] != major[1] && minor[0] != minor[1] && patch[0] != patch[1] && build[0] != build[1])
 			{
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "BPF probe is compiled for %s, but running version is %s",
 					 (char *) data->d_buf, osname.release);
