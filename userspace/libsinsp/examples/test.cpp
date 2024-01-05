@@ -20,6 +20,7 @@ limitations under the License.
 #include <signal.h>
 #include <unistd.h>
 #include <sinsp.h>
+#include <chrono>
 #include "util.h"
 
 using namespace std;
@@ -48,6 +49,58 @@ Options:
 //   "evt.category=process or evt.category=net"
 //   "evt.dir=< and (evt.category=net or (evt.type=execveat or evt.type=execve or evt.type=clone or evt.type=fork or evt.type=vfork))"
 // 
+void testPagefault(sinsp *inspector){
+	//uint32_t threadcount = inspector->m_thread_manager->get_thread_count();
+	threadinfo_map_t *threadmap = inspector->m_thread_manager->get_threads();
+    unordered_map<int64_t, threadinfo_map_t::ptr_t> threadstable = threadmap->getThreadsTable();
+    unordered_map<int64_t, int64_t> maj_mp, min_mp; //from pid to maj or min value
+
+    //1. test initialization of therads table.
+    cout << "total number of threads initialized is " << threadstable.size() << "...\n";
+	for(auto e: threadstable){
+		sinsp_threadinfo* tmp = e.second.get();
+        if(tmp->m_pid == tmp->m_tid) continue;
+        maj_mp[tmp->m_pid] += tmp->m_pfmajor;
+        min_mp[tmp->m_pid] += tmp->m_pfminor;
+		//cout << "pid is " << tmp->m_pid << " & tid is " << tmp->m_tid << " maj_flt: " << tmp->m_pfmajor << "\tmin_flt: " << tmp->m_pfminor << '\n';
+	}
+    for(auto e: min_mp){
+        auto tmp = threadstable.find(e.first);
+        sinsp_threadinfo* temp = inspector->build_threadinfo();
+        temp->m_pid = temp->m_tid = e.first;
+        temp->m_pfminor = tmp->second->m_pfminor - e.second;
+        temp->m_pfmajor = tmp->second->m_pfmajor - maj_mp[e.first];
+        threadstable[temp->m_tid] = threadinfo_map_t::ptr_t(temp);
+    }
+    for(auto e: threadstable){
+		sinsp_threadinfo* tmp = e.second.get();
+		cout << "pid is " << tmp->m_pid << " & tid is " << tmp->m_tid << ": maj_flt: " << tmp->m_pfmajor << "\tmin_flt: " << tmp->m_pfminor << '\n';
+
+	}
+
+    //2. test eBPF pagefault_map
+    uint64_t last_time = 0;
+    pagefault_data *results = new pagefault_data[101000];
+    int32_t maxlen = 65535;
+    int counts = 0;
+    for(int i = 0;i < 5;i++){
+        chrono::nanoseconds ns = std::chrono::duration_cast< std::chrono::nanoseconds>(
+		    std::chrono::system_clock::now().time_since_epoch()
+	    );
+        uint64_t cur = ns.count();
+        inspector->get_page_faults_from_map(last_time, cur, results, &counts, maxlen);
+        last_time = cur;
+        cout << "curtime: " << cur << "---catch " << counts << " pagefaults from 2 seconds before." << endl;
+        for(int j = 0; j < counts;j++){
+            cout << "pid: " << results[j].pid << " tid: " << results[j].tid << " major: " << results[j].maj_flt << " minor: " << results[j].min_flt
+                 << " vmsize: " << results[j].vm_size << " vmrss: " << results[j].vm_rss << " vmswap: " << results[j].vm_swap << " timestamp: " << results[j].timestamp << endl << endl;
+        }
+        sleep(2);
+    }
+    
+    delete []results;
+}
+
 int main(int argc, char **argv)
 {
     sinsp inspector;
@@ -82,7 +135,9 @@ int main(int argc, char **argv)
     signal(SIGPIPE, sigint_handler);
 
     inspector.open();
+    inspector.enable_page_faults();
 
+    
     if(!filter_string.empty())
     {
         try
@@ -94,6 +149,8 @@ int main(int argc, char **argv)
         }
     }
 
+    testPagefault(&inspector);
+    
     while(!g_interrupted)
     {
         sinsp_evt* ev = NULL;
@@ -116,8 +173,23 @@ int main(int argc, char **argv)
             string cmdline;
             sinsp_threadinfo::populate_cmdline(cmdline, thread);
 
-            if(thread->is_main_thread())
+            if(ev->get_type() == PPME_PAGE_FAULT_E)
             {
+                 cout << "[PAGEFAULTS]:[PID=" << thread->m_pid << "]:"
+                    << "[TID=" << thread->m_tid << "]:"
+                    << "[TYPE=" << get_event_type(ev->get_type()) << "]:"
+                    << "[EXE=" << thread->get_exepath() << "]:"
+                    << "[CMD=" << cmdline << "]"
+                    << "[PAGE_FAULT_MAJOR=" << *((uint64_t *) (ev->get_param(0)->m_val)) << "]:"
+                    << "[PAGE_FAULT_MINOR=" << *((uint64_t *) (ev->get_param(1)->m_val)) << "]"
+                    << "[VMSIZE=" << *((uint32_t *) (ev->get_param(2)->m_val)) << "]"
+                    << "[VMRSS=" << *((uint32_t *) (ev->get_param(3)->m_val)) << "]"
+                    << "[VMSWAP=" << *((uint32_t *) (ev->get_param(4)->m_val)) << "]"
+                    << endl << endl;     
+            }
+
+            if(thread->is_main_thread())
+            { 
                 string date_time;
                 sinsp_utils::ts_to_iso_8601(ev->get_ts(), &date_time);
 
@@ -163,13 +235,13 @@ int main(int argc, char **argv)
                 {
                     parent_pid = p_thr->m_pid;
                 }
-
                 cout << "[PPID=" << parent_pid << "]:"
                           << "[PID=" << thread->m_pid << "]:"
+                          << "[TID=" << thread->m_tid << "]:"
                           << "[TYPE=" << get_event_type(ev->get_type()) << "]:"
                           << "[EXE=" << thread->get_exepath() << "]:"
                           << "[CMD=" << cmdline << "]"
-                          << endl;
+                          << endl << endl;
             }
         }
         else

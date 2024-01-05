@@ -90,14 +90,6 @@ struct bpf_map_def __bpf_section("maps") local_state_map = {
 	.max_entries = 0,
 };
 
-#ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
-struct bpf_map_def __bpf_section("maps") stash_map = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(u64),
-	.value_size = sizeof(struct sys_stash_args),
-	.max_entries = 65535,
-};
-#endif
 
 struct bpf_map_def __bpf_section("maps") rtt_static_map = {
         .type = BPF_MAP_TYPE_HASH,
@@ -112,6 +104,22 @@ struct bpf_map_def __bpf_section("maps") stash_tuple_map = {
 	.value_size = sizeof(struct tuple),
 	.max_entries = 65535,
 };
+
+struct bpf_map_def __bpf_section("maps") pagefault_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(pid_t),
+	.value_size = sizeof(struct pagefault_data),
+	.max_entries = 1048576,
+};
+
+#ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
+struct bpf_map_def __bpf_section("maps") stash_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(u64),
+	.value_size = sizeof(struct sys_stash_args),
+	.max_entries = 65535,
+};
+#endif
 
 enum offcpu_type {
     ON, // 0

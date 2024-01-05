@@ -116,6 +116,30 @@ static int bpf_map_update_elem(int fd, const void *key, const void *value, uint6
 	return sys_bpf(BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
 }
 
+static int bpf_map_get_next_key(int fd, void *key, void *next_key){
+	union bpf_attr attr;
+
+	bzero(&attr, sizeof(attr));
+
+	attr.map_fd = fd;
+	attr.key = (unsigned long) key;
+	attr.next_key = (unsigned long) next_key;
+
+	return sys_bpf(BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+}
+
+static int bpf_map_delete_elem(int fd, const void *key)
+{
+	union bpf_attr attr;
+
+	bzero(&attr, sizeof(attr));
+
+	attr.map_fd = fd;
+	attr.key = (unsigned long) key;
+
+	return sys_bpf(BPF_MAP_DELETE_ELEM, &attr, sizeof(attr));
+}
+
 static int bpf_map_lookup_elem(int fd, const void *key, void *value)
 {
 	union bpf_attr attr;
@@ -838,8 +862,17 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		   memcmp(shname, "raw_tracepoint/", sizeof("raw_tracepoint/") - 1) == 0 ||
 		   memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
 		   memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0)
-		{
-			int load_result = load_tracepoint(handle, shname, data->d_buf, data->d_size);
+		{	
+			//Handling multiple programs on the same hook point
+			char event[100];
+			strcpy(event, shname);
+			int len = strlen(event);
+			if(len >= 9 && strncmp(&event[len - 9], "_multiple", 9) == 0)
+			{
+				event[len - 9] = '\0';
+			}
+
+			int load_result = load_tracepoint(handle, event, data->d_buf, data->d_size);
 			if((memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
 			    memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0) &&
 			   load_result == SCAP_UNKNOWN_KPROBE)
@@ -1221,6 +1254,33 @@ int32_t scap_bpf_enable_dynamic_snaplen(scap_t* handle)
 	return SCAP_SUCCESS;
 }
 
+/*
+		    						 |last_time|--------scan_interval--------|cur_time|
+	A(ignore): |pagefault.timestamp|
+	B(catch): 					  		   			 |pagefault.timestamp|
+*/
+int32_t scap_bpf_get_page_faults_from_map(scap_t* handle, uint64_t last_time, uint64_t cur_time, struct pagefault_data results[], int32_t *counts, int32_t maxlen)
+{
+	int next_key, lookup_key;
+	lookup_key = -1;
+	int32_t cnt = 0;
+	while(bpf_map_get_next_key(handle->m_bpf_map_fds[SYSDIG_PAGEFAULT_MAP], &lookup_key, &next_key) == 0){
+		if(bpf_map_lookup_elem(handle->m_bpf_map_fds[SYSDIG_PAGEFAULT_MAP], &next_key, &results[cnt]) != 0){
+			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "SYSDIG_PAGEFAULT_MAP bpf_map_lookup_elem < 0");
+			return SCAP_FAILURE;
+		}
+		if(results[cnt].timestamp > last_time  && results[cnt].timestamp <= cur_time) {
+			cnt++;
+		}
+		lookup_key = next_key;
+		if(cnt >= maxlen){
+			break;
+		}
+	}
+	*counts = cnt;
+	return SCAP_SUCCESS;
+}
+
 int32_t scap_bpf_enable_page_faults(scap_t* handle)
 {
 	struct sysdig_bpf_settings settings;
@@ -1443,6 +1503,7 @@ static int32_t set_default_settings(scap_t *handle)
 	settings.is_dropping = false;
 	settings.tracers_enabled = false;
 	settings.skb_capture = false;
+	settings.pgft_map_clear = false;
 	settings.fullcapture_port_range_start = 0;
 	settings.fullcapture_port_range_end = 0;
 	settings.statsd_port = 8125;

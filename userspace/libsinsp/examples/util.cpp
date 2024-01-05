@@ -325,6 +325,9 @@ std::string get_event_type(uint16_t type)
         case PPME_SOCKET_RECVMSG_X: return "recvmsg";
         case PPME_SOCKET_RECVMMSG_E:
         case PPME_SOCKET_RECVMMSG_X: return "recvmmsg";
+        //page fault
+        case PPME_PAGE_FAULT_E:
+        case PPME_PAGE_FAULT_X: return "pagefault";
         default: return "UNKNOWN " + to_string(type);
     };
 }

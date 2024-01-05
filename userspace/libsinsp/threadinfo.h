@@ -33,6 +33,7 @@ struct iovec {
 #include <functional>
 #include <memory>
 #include <set>
+#include <iostream>
 #include "fdinfo.h"
 #include "internal_metrics.h"
 
@@ -524,6 +525,10 @@ public:
 	inline size_t size() const
 	{
 		return m_threads.size();
+	}
+
+	inline std::unordered_map<int64_t, ptr_t> getThreadsTable(){
+		return m_threads;
 	}
 
 protected:

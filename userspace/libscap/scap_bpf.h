@@ -18,6 +18,7 @@ limitations under the License.
 #define _SCAP_BPF_H
 
 #include "compat/perf_event.h"
+#include "../../driver/bpf/types.h"
 
 struct perf_event_sample {
 	struct perf_event_header header;
@@ -41,6 +42,7 @@ int32_t scap_bpf_set_statsd_port(scap_t* handle, uint16_t port);
 int32_t scap_bpf_enable_dynamic_snaplen(scap_t* handle);
 int32_t scap_bpf_disable_dynamic_snaplen(scap_t* handle);
 int32_t scap_bpf_enable_page_faults(scap_t* handle);
+int32_t scap_bpf_get_page_faults_from_map(scap_t* handle, uint64_t last_time, uint64_t cur_time, struct pagefault_data results[], int32_t *counts, int32_t maxlen);
 int32_t scap_bpf_start_dropping_mode(scap_t* handle, uint32_t sampling_ratio);
 int32_t scap_bpf_stop_dropping_mode(scap_t* handle);
 int32_t scap_bpf_enable_tracers_capture(scap_t* handle);

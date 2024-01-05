@@ -712,7 +712,7 @@ static __always_inline bool prepare_filler(void *ctx,
 		goto cleanup;
 	return true;
 
-	cleanup:
+cleanup:
 	release_local_state(state);
 	return false;
 }

@@ -1782,7 +1782,8 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 	if(tid == m_last_tid)
 	{
 		thr = m_last_tinfo.lock();
-		if (thr)                                                                                     {
+		if(thr)
+		{
 #ifdef GATHER_INTERNAL_STATS
 			m_cached_lookups->increment();
 #endif
@@ -1790,7 +1791,8 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 			// for something that may not need to be precise
 			thr->m_lastaccess_ts = m_inspector->get_lastevent_ts();
 			return thr;
-		}                                                                                        }
+		}     
+	}
 
 	//
 	// Caching failed, do a real lookup

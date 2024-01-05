@@ -152,6 +152,39 @@ BPF_PROBE("raw_syscalls/", sys_exit, sys_exit_args)
 	return 0;
 }
 
+// Multiple eBPF programs on the same hook point
+// Warning: this prog must be in the front of another. Make sure the tail_call is at the end.
+BPF_PROBE("sched/", sched_process_exit_multiple, sched_process_exit_args)
+{
+	struct sysdig_bpf_settings *settings;
+	struct task_struct *task;
+	unsigned int flags;
+
+	task = (struct task_struct *)bpf_get_current_task();
+
+	flags = _READ(task->flags);
+	if (flags & PF_KTHREAD)
+		return 0;
+
+	settings = get_bpf_settings();
+	if (!settings)
+		return 0;
+
+	if (!settings->capture_enabled)
+		return 0;
+
+	u32 tid = _READ(task->pid);
+	//perf out pagefault data as an event when the thread exited.
+	if (settings->page_faults) {
+		if (prepare_filler(ctx, ctx, PPME_PAGE_FAULT_E, settings, 0)) { 
+			bpf_pagefault_analysis(ctx, tid);
+		}
+		bpf_map_delete_elem(&pagefault_map, &tid);
+	}
+
+	return 0;
+}
+
 BPF_PROBE("sched/", sched_process_exit, sched_process_exit_args)
 {
 	struct sysdig_bpf_settings *settings;
@@ -174,8 +207,8 @@ BPF_PROBE("sched/", sched_process_exit, sched_process_exit_args)
 
 	evt_type = PPME_PROCEXIT_1_E;
 #ifdef CPU_ANALYSIS
-	// perf out
 	u32 tid = _READ(task->pid);
+	// perf out
 	if (prepare_filler(ctx, ctx, PPME_CPU_ANALYSIS_E, settings, 0)) {
 		bpf_cpu_analysis(ctx, tid);
 	}
@@ -328,7 +361,6 @@ BPF_PROBE("sched/", sched_wakeup, sched_process_exit_args)
 static __always_inline int bpf_page_fault(struct page_fault_args *ctx)
 {
 	struct sysdig_bpf_settings *settings;
-	enum ppm_event_type evt_type;
 
 	settings = get_bpf_settings();
 	if (!settings)
@@ -339,10 +371,37 @@ static __always_inline int bpf_page_fault(struct page_fault_args *ctx)
 
 	if (!settings->capture_enabled)
 		return 0;
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+	struct mm_struct *mm = _READ(task->mm);
+	pid_t tid = _READ(task->pid);
+	pid_t pid = _READ(task->tgid);
+	u64 cur_maj = _READ(task->maj_flt);
+	struct pagefault_data *last_pgft = bpf_map_lookup_elem(&pagefault_map, &tid);
+	if(!last_pgft && cur_maj != 0)
+	{
+		struct pagefault_data pgft_data = {};
+		bpf_map_update_elem(&pagefault_map, &tid, &pgft_data, BPF_ANY);
+		last_pgft = bpf_map_lookup_elem(&pagefault_map, &tid);
+	}
+	
+	if(last_pgft && cur_maj != last_pgft->maj_flt)
+	{
+		last_pgft->pid = pid;
+		last_pgft->tid = tid;
+		last_pgft->maj_flt = _READ(task->maj_flt);
+		last_pgft->min_flt = _READ(task->min_flt);
 
-	evt_type = PPME_PAGE_FAULT_E;
+		if (mm) 
+		{
+			last_pgft->vm_size = _READ(mm->total_vm);
+			last_pgft->vm_size <<= (PAGE_SHIFT - 10);
+			last_pgft->vm_rss = bpf_get_mm_rss(mm) << (PAGE_SHIFT - 10);
+			last_pgft->vm_swap = bpf_get_mm_swap(mm) << (PAGE_SHIFT - 10);
+		}
 
-	call_filler(ctx, ctx, evt_type, settings, UF_ALWAYS_DROP);
+		last_pgft->timestamp = bpf_ktime_get_ns() + settings->boot_time;
+	}
+	
 	return 0;
 }
 

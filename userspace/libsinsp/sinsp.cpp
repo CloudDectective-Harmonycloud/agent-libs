@@ -248,6 +248,21 @@ void sinsp::enable_tracers_capture()
 #endif
 }
 
+int32_t sinsp::get_page_faults_from_map(uint64_t last_time, uint64_t cur_time, struct pagefault_data results[], int32_t *counts, int32_t maxlen)
+{
+#if defined(HAS_CAPTURE) && ! defined(CYGWING_AGENT) && ! defined(_WIN32)
+	if(is_live() && m_h != NULL)
+	{
+		int32_t ret = scap_get_page_faults_from_map(m_h, last_time, cur_time, results, counts, maxlen);
+		if(ret == SCAP_FAILURE)
+		{
+			throw sinsp_exception("error getting page_faults from map");
+		}
+		return ret;
+	}
+#endif
+}
+
 void sinsp::enable_page_faults()
 {
 #if defined(HAS_CAPTURE) && ! defined(CYGWING_AGENT) && ! defined(_WIN32)
@@ -260,6 +275,7 @@ void sinsp::enable_page_faults()
 	}
 #endif
 }
+
 
 void sinsp::init()
 {
