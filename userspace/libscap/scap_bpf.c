@@ -38,12 +38,15 @@ limitations under the License.
 #include "scap.h"
 #include "scap-int.h"
 #include "scap_bpf.h"
+#include "scap_func_symbol.h"
 #include "driver_config.h"
 #include "../../driver/bpf/types.h"
 #include "../../driver/bpf/maps.h"
 #include "compat/misc.h"
 #include "compat/bpf.h"
-
+// #define NONE         "\033[m"
+// #define RED          "\033[0;32;31m"
+// #define GREEN        "\033[0;32;32m"
 
 #ifdef MINIMAL_BUILD
 #undef MINIMAL_BUILD
@@ -57,7 +60,8 @@ limitations under the License.
 // subset of features needed.
 //
 
-struct bpf_map_data {
+struct bpf_map_data
+{
 	int fd;
 	size_t elf_offset;
 	struct bpf_map_def def;
@@ -67,12 +71,11 @@ static const int BUF_SIZE_PAGES = 2048;
 
 static const int BPF_LOG_SIZE = 1 << 18;
 
-static char* license;
+static char *license;
 
 #define FILLER_NAME_FN(x) #x,
 static const char *g_filler_names[PPM_FILLER_MAX] = {
-	FILLER_LIST_MAPPER(FILLER_NAME_FN)
-};
+	FILLER_LIST_MAPPER(FILLER_NAME_FN)};
 #undef FILLER_NAME_FN
 
 static int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr, unsigned int size)
@@ -109,8 +112,8 @@ static int bpf_map_update_elem(int fd, const void *key, const void *value, uint6
 	bzero(&attr, sizeof(attr));
 
 	attr.map_fd = fd;
-	attr.key = (unsigned long) key;
-	attr.value = (unsigned long) value;
+	attr.key = (unsigned long)key;
+	attr.value = (unsigned long)value;
 	attr.flags = flags;
 
 	return sys_bpf(BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
@@ -123,8 +126,8 @@ static int bpf_map_lookup_elem(int fd, const void *key, void *value)
 	bzero(&attr, sizeof(attr));
 
 	attr.map_fd = fd;
-	attr.key = (unsigned long) key;
-	attr.value = (unsigned long) value;
+	attr.key = (unsigned long)key;
+	attr.value = (unsigned long)value;
 
 	return sys_bpf(BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
 }
@@ -147,35 +150,40 @@ static int bpf_map_create(enum bpf_map_type map_type,
 }
 static uint32_t find_vdso_code()
 {
-    char *vdso = (char *) getauxval(AT_SYSINFO_EHDR);
-    if (vdso == NULL) {
-        return 0;
-    }
-    if (memcmp(vdso, ELFMAG, 4)) {
-        return 0;
-    }
-    const ElfW(Ehdr) *ehdr = (const ElfW(Ehdr) *) vdso;
-    int i;
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        const ElfW(Shdr) *shdr = (const ElfW(Shdr) *)(vdso + ehdr->e_shoff + (i * ehdr->e_shentsize));
-        if (shdr->sh_type == SHT_NOTE) {
-            const char *ptr = (const char *)(vdso + shdr->sh_offset);
-            const char *end = ptr + shdr->sh_size;
-            while (ptr < end) {
-                const ElfW(Nhdr) *nhdr = (const ElfW(Nhdr) *) ptr;
-                ptr += sizeof(*nhdr);
-                const char *name = ptr;
-                ptr += (nhdr->n_namesz + sizeof(ElfW(Word)) - 1) & -sizeof(ElfW(Word));
-                const char *desc = ptr;
-                ptr += (nhdr->n_descsz + sizeof(ElfW(Word)) - 1) & -sizeof(ElfW(Word));
-                if ((nhdr->n_namesz > 5 && !memcmp(name, "Linux", 5)) && nhdr->n_descsz == 4 && !nhdr->n_type)
-                {
-                    return *(uint32_t *) desc;
-                }
-            }
-        }
-    }
-    return 0;
+	char *vdso = (char *)getauxval(AT_SYSINFO_EHDR);
+	if(vdso == NULL)
+	{
+		return 0;
+	}
+	if(memcmp(vdso, ELFMAG, 4))
+	{
+		return 0;
+	}
+	const ElfW(Ehdr) *ehdr = (const ElfW(Ehdr) *)vdso;
+	int i;
+	for(i = 0; i < ehdr->e_shnum; i++)
+	{
+		const ElfW(Shdr) *shdr = (const ElfW(Shdr) *)(vdso + ehdr->e_shoff + (i * ehdr->e_shentsize));
+		if(shdr->sh_type == SHT_NOTE)
+		{
+			const char *ptr = (const char *)(vdso + shdr->sh_offset);
+			const char *end = ptr + shdr->sh_size;
+			while(ptr < end)
+			{
+				const ElfW(Nhdr) *nhdr = (const ElfW(Nhdr) *)ptr;
+				ptr += sizeof(*nhdr);
+				const char *name = ptr;
+				ptr += (nhdr->n_namesz + sizeof(ElfW(Word)) - 1) & -sizeof(ElfW(Word));
+				const char *desc = ptr;
+				ptr += (nhdr->n_descsz + sizeof(ElfW(Word)) - 1) & -sizeof(ElfW(Word));
+				if((nhdr->n_namesz > 5 && !memcmp(name, "Linux", 5)) && nhdr->n_descsz == 4 && !nhdr->n_type)
+				{
+					return *(uint32_t *)desc;
+				}
+			}
+		}
+	}
+	return 0;
 }
 static uint32_t get_kernel_version()
 {
@@ -183,68 +191,68 @@ static uint32_t get_kernel_version()
 	char filename[256];
 	unsigned x, y, z;
 	int i = 0;
-	for (i = 0; i < 4; i++)
+	for(i = 0; i < 4; i++)
 	{
 		switch(i)
 		{
-		    case 0:
-		    {
-		        return find_vdso_code();
-            }
-			case 1:
-			{
-				// KERNEL_VERSION_CODE, as environment variable
-				// KERNEL_VERSION_CODE = (VERSION * 65536) + (PATCHLEVEL * 256) + SUBLEVEL
-				// same to KERNEL_VERSION
-				char *kernel_version_c = getenv("KERNEL_VERSION_CODE");
-				if (kernel_version_c != NULL)
-					return atoi(kernel_version_c);
+		case 0:
+		{
+			return find_vdso_code();
+		}
+		case 1:
+		{
+			// KERNEL_VERSION_CODE, as environment variable
+			// KERNEL_VERSION_CODE = (VERSION * 65536) + (PATCHLEVEL * 256) + SUBLEVEL
+			// same to KERNEL_VERSION
+			char *kernel_version_c = getenv("KERNEL_VERSION_CODE");
+			if(kernel_version_c != NULL)
+				return atoi(kernel_version_c);
+			break;
+		}
+		case 2:
+		{
+			// ubuntu
+			// check /proc/version_signature
+			int t;
+			snprintf(filename, sizeof(filename), "%s/proc/version_signature", scap_get_host_root());
+			int fd = open(filename, O_RDONLY, 0);
+			int res = read(fd, buf, sizeof(buf));
+			if(sscanf(buf, "Ubuntu %d.%d.%d-%d.%d-generic %d.%d.%d", &t, &t, &t, &t, &t, &x, &y, &z) != 8)
 				break;
-			}
-			case 2:
-			{
-				// ubuntu
-				// check /proc/version_signature
-				int t;
-				snprintf(filename, sizeof(filename), "%s/proc/version_signature", scap_get_host_root());
-				int fd = open(filename, O_RDONLY, 0);
-				int res = read(fd, buf, sizeof(buf));
-				if (sscanf(buf, "Ubuntu %d.%d.%d-%d.%d-generic %d.%d.%d", &t, &t, &t, &t, &t, &x, &y, &z) != 8)
-					break;
-				return KERNEL_VERSION(x, y, z);
-			}
-			case 3:
-			{
-				// debian
-				// check /proc/sys/kernel/version
-				snprintf(filename, sizeof(filename), "%s/proc/sys/kernel/version", scap_get_host_root());
-				int fd = open(filename, O_RDONLY, 0);
-				if (fd < 0)
-					break;
-				int res = read(fd, buf, sizeof(buf));
-				if (sscanf(buf, "#1 SMP Debian %d.%d.%d-x (xxxx-xx-xx)", &x, &y, &z) != 3)
-					break;
-				return KERNEL_VERSION(x, y, z);
-			}
-			case 4:
-			{
-				// uname
-				struct utsname utsn;
-				uname(&utsn);
-				if (sscanf(utsn.release, "%d.%d.%d", &x, &y, &z) != 3)
-					return 0;
-				return KERNEL_VERSION(x, y, z);
-			}
-			default:
+			return KERNEL_VERSION(x, y, z);
+		}
+		case 3:
+		{
+			// debian
+			// check /proc/sys/kernel/version
+			snprintf(filename, sizeof(filename), "%s/proc/sys/kernel/version", scap_get_host_root());
+			int fd = open(filename, O_RDONLY, 0);
+			if(fd < 0)
+				break;
+			int res = read(fd, buf, sizeof(buf));
+			if(sscanf(buf, "#1 SMP Debian %d.%d.%d-x (xxxx-xx-xx)", &x, &y, &z) != 3)
+				break;
+			return KERNEL_VERSION(x, y, z);
+		}
+		case 4:
+		{
+			// uname
+			struct utsname utsn;
+			uname(&utsn);
+			if(sscanf(utsn.release, "%d.%d.%d", &x, &y, &z) != 3)
 				return 0;
+			return KERNEL_VERSION(x, y, z);
+		}
+		default:
+			return 0;
 		}
 	}
 }
 static uint32_t bpf_load_program(const struct bpf_insn *insns,
-			    enum bpf_prog_type type,
-			    size_t insns_cnt,
-			    char *log_buf,
-			    size_t log_buf_sz)
+				 enum bpf_prog_type type,
+				 size_t insns_cnt,
+				 char *log_buf,
+				 size_t log_buf_sz)
 {
 	union bpf_attr attr;
 	int fd;
@@ -252,14 +260,14 @@ static uint32_t bpf_load_program(const struct bpf_insn *insns,
 	bzero(&attr, sizeof(attr));
 
 	attr.prog_type = type;
-	attr.insn_cnt = (uint32_t) insns_cnt;
-	attr.insns = (unsigned long) insns;
-	attr.license = (unsigned long) license;
-	attr.log_buf = (unsigned long) NULL;
+	attr.insn_cnt = (uint32_t)insns_cnt;
+	attr.insns = (unsigned long)insns;
+	attr.license = (unsigned long)license;
+	attr.log_buf = (unsigned long)NULL;
 	attr.log_size = 0;
 	attr.log_level = 0;
 
-	if (type == BPF_PROG_TYPE_KPROBE)
+	if(type == BPF_PROG_TYPE_KPROBE)
 	{
 		attr.kern_version = get_kernel_version();
 	}
@@ -270,7 +278,7 @@ static uint32_t bpf_load_program(const struct bpf_insn *insns,
 		return fd;
 	}
 
-	attr.log_buf = (unsigned long) log_buf;
+	attr.log_buf = (unsigned long)log_buf;
 	attr.log_size = log_buf_sz;
 	attr.log_level = 1;
 	log_buf[0] = 0;
@@ -283,7 +291,7 @@ static int bpf_raw_tracepoint_open(const char *name, int prog_fd)
 	union bpf_attr attr;
 
 	bzero(&attr, sizeof(attr));
-	attr.raw_tracepoint.name = (unsigned long) name;
+	attr.raw_tracepoint.name = (unsigned long)name;
 	attr.raw_tracepoint.prog_fd = prog_fd;
 
 	return sys_bpf(BPF_RAW_TRACEPOINT_OPEN, &attr, sizeof(attr));
@@ -496,7 +504,7 @@ static int write_kprobe_events(const char *val)
 	if(val == NULL)
 		return -1;
 
-	fd = open("/sys/kernel/debug/tracing/kprobe_events",  O_APPEND | O_WRONLY);
+	fd = open("/sys/kernel/debug/tracing/kprobe_events", O_APPEND | O_WRONLY);
 
 	ret = write(fd, val, strlen(val));
 	close(fd);
@@ -504,7 +512,22 @@ static int write_kprobe_events(const char *val)
 	return ret;
 }
 
-static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_insn *prog, int size)
+static int write_uprobe_events(char *val)
+{
+	int fd, ret;
+
+	if(val == NULL)
+		return -1;
+
+	fd = open("/sys/kernel/debug/tracing/uprobe_events", O_APPEND | O_WRONLY);
+
+	ret = write(fd, val, strlen(val));
+	close(fd);
+
+	return ret;
+}
+
+static int32_t load_and_attach(scap_t *handle, const char *event, struct bpf_insn *prog, int size, const char *target_file_path)
 {
 	struct perf_event_attr attr = {};
 	enum bpf_prog_type program_type = BPF_PROG_TYPE_UNSPEC;
@@ -518,6 +541,8 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 
 	bool is_kprobe = strncmp(event, "kprobe/", 7) == 0;
 	bool is_kretprobe = strncmp(event, "kretprobe/", 10) == 0;
+	bool is_uprobe = strncmp(event, "uprobe/", 7) == 0;
+	bool is_uretprobe = strncmp(event, "uretprobe/", 10) == 0;
 	bool is_tracepoint = strncmp(event, "tracepoint/", 11) == 0;
 	bool is_raw_tracepoint = strncmp(event, "raw_tracepoint/", 15) == 0;
 
@@ -575,6 +600,57 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			strcat(buf, "/id");
 		}
 	}
+	else if(is_uprobe || is_uretprobe)
+	{
+		/*
+		 * https://www.kernel.org/doc/Documentation/trace/uprobetracer.txt
+		 * uprobe use type BPF_PROG_TYPE_KPROBE
+		 */
+		program_type = BPF_PROG_TYPE_KPROBE;
+		if(is_uprobe)
+			event += 7;
+		else
+			event += 10;
+
+		if(memcmp(event, "filler/", sizeof("filler/") - 1) != 0)
+		{
+			uint64_t addr;
+
+			char *func_symbol = event;
+			int i = 0;
+			while(true)
+			{
+				if(func_symbol[i] == ':')
+					break;
+				i++;
+			}
+			func_symbol += (i + 1);
+			char str[200];
+			sscanf(event, "%[^:]", str);
+			event = str;
+			err = bcc_resolve_symname(target_file_path, func_symbol, &addr);
+			if(err < 0)
+			{
+				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to resolve symbol name '%s' error '%s'\n", func_symbol, strerror(errno));
+				return SCAP_UPROBE_SKIP;
+			}
+			// printf(GREEN"%s:%s symbol exist\n"NONE, target_file_path, func_symbol);
+			char *identifier = generate_identifier(target_file_path);
+			snprintf(buf, sizeof(buf), "%s%s%s %s:0x%" PRIx64 "",
+				 is_uprobe ? "p:" : "r:", event, identifier, target_file_path, addr);
+			err = write_uprobe_events(buf);
+			if(err < 0 && errno != 17)
+			{
+				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to create uprobe '%s' error '%s'\n", event, strerror(errno));
+				return SCAP_FAILURE;
+			}
+
+			strcpy(buf, "/sys/kernel/debug/tracing/events/uprobes/");
+			strcat(buf, event);
+			strcat(buf, identifier);
+			strcat(buf, "/id");
+		}
+	}
 
 	if(*event == 0)
 	{
@@ -583,17 +659,46 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 	}
 
 	fd = bpf_load_program(prog, program_type, insns_cnt, error, BPF_LOG_SIZE);
+
 	if(fd < 0)
 	{
-		fprintf(stderr, "%s", error);
-		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "bpf_load_program() err=%d event=%s message=%s", errno, event, error);
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "bpf_load_program() err=%d event=%s message=%s\n", errno, event, error);
+		// fprintf(stderr, "%s\n", handle->m_lasterr);
 		free(error);
 		return SCAP_FAILURE;
 	}
 
 	free(error);
+	if(target_file_path != NULL)
+	{
+		int cnt = 0;
+		// find an array space to store uprobe fd and pmc fd
+		if(handle->m_uprobe_prog_cnt == 0)
+		{
+			handle->m_uprobe_prog_cnt++;
+		}
+		while(handle->m_uprobe_array_idx_is_used[handle->m_uprobe_prog_cnt] == true)
+		{
+			handle->m_uprobe_prog_cnt = (handle->m_uprobe_prog_cnt + 1) % BPF_PROGS_MAX;
+			cnt++;
+			if(cnt > BPF_PROGS_MAX + 10)
+			{
+				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "handle->m_uprobe_prog_fds[] is full, please enlarge the size of m_uprobe_prog_fds[] and m_uprobe_event_fd[]");
+				return SCAP_FAILURE;
+			}
+			if(handle->m_uprobe_prog_cnt == 0)
+			{
+				handle->m_uprobe_prog_cnt++;
+			}
+		}
 
-	handle->m_bpf_prog_fds[handle->m_bpf_prog_cnt++] = fd;
+		handle->m_uprobe_prog_fds[handle->m_uprobe_prog_cnt] = fd;
+		handle->m_uprobe_array_idx_is_used[handle->m_uprobe_prog_cnt] = true;
+	}
+	else
+	{
+		handle->m_bpf_prog_fds[handle->m_bpf_prog_cnt++] = fd;
+	}
 
 	if(memcmp(event, "filler/", sizeof("filler/") - 1) == 0)
 	{
@@ -612,7 +717,7 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "invalid filler name: %s", event);
 			return SCAP_FAILURE;
 		}
-
+		// used for tail_call only for traccepoint, kprobe and uprobe use subfunction instead of tail_call
 		err = bpf_map_update_elem(handle->m_bpf_map_fds[handle->m_bpf_prog_array_map_idx], &prog_id, &fd, BPF_ANY);
 		if(err < 0)
 		{
@@ -640,7 +745,7 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 		if(efd < 0)
 		{
 			if(strcmp(event, "exceptions/page_fault_user") == 0 ||
-			strcmp(event, "exceptions/page_fault_kernel") == 0)
+			   strcmp(event, "exceptions/page_fault_kernel") == 0)
 			{
 				return SCAP_SUCCESS;
 			}
@@ -649,7 +754,8 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			if(is_kprobe || is_kretprobe)
 			{
 				return SCAP_UNKNOWN_KPROBE;
-			}else
+			}
+			else
 			{
 				return SCAP_FAILURE;
 			}
@@ -675,11 +781,13 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "event %d fd %d err %s", id, efd, scap_strerror(handle, errno));
 			return SCAP_FAILURE;
 		}
+
 		if(ioctl(efd, PERF_EVENT_IOC_ENABLE, 0))
 		{
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "PERF_EVENT_IOC_ENABLE: %s", scap_strerror(handle, errno));
 			return SCAP_FAILURE;
 		}
+
 		if(ioctl(efd, PERF_EVENT_IOC_SET_BPF, fd))
 		{
 			close(efd);
@@ -687,14 +795,25 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			return SCAP_FAILURE;
 		}
 	}
-
-	handle->m_bpf_event_fd[handle->m_bpf_prog_cnt - 1] = efd;
+	if(target_file_path != NULL)
+	{
+		handle->m_uprobe_event_fd[handle->m_uprobe_prog_cnt] = efd;
+		// puts("==> add uprobe successfully:");
+        // printf("event id %d\n",id);
+        // printf("event efd %d\n",efd);
+        // printf("prog fd %d\n",fd);
+		// printf("m_uprobe_prog_cnt %d\n", handle->m_uprobe_prog_cnt);
+	}
+	else
+	{
+		handle->m_bpf_event_fd[handle->m_bpf_prog_cnt - 1] = efd;
+	}
 
 	return SCAP_SUCCESS;
 }
 
 #ifndef MINIMAL_BUILD
-static int32_t load_bpf_file(scap_t *handle, const char *path)
+static int32_t load_bpf_file(scap_t *handle, const char *path, bool is_uprobe, const char *target_file_path)
 {
 	int j;
 	int maps_shndx = 0;
@@ -711,6 +830,14 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 	struct utsname osname;
 	int32_t res = SCAP_FAILURE;
 
+	static int program_fd = 0;
+	static Elf *elf = NULL;
+
+	if(is_uprobe)
+	{
+		goto load_prog;
+	}
+
 	if(uname(&osname))
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't call uname()");
@@ -723,21 +850,21 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		return SCAP_FAILURE;
 	}
 
-	int program_fd = open(path, O_RDONLY, 0);
+	program_fd = open(path, O_RDONLY, 0);
 	if(program_fd < 0)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't open BPF probe '%s': %s", path, scap_strerror(handle, errno));
 		return SCAP_FAILURE;
 	}
 
-	Elf *elf = elf_begin(program_fd, ELF_C_READ_MMAP_PRIVATE, NULL);
+	elf = elf_begin(program_fd, ELF_C_READ_MMAP_PRIVATE, NULL);
 	if(!elf)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't read ELF format");
 		goto cleanup;
 	}
 
-	GElf_Ehdr ehdr;
+	static GElf_Ehdr ehdr;
 	if(gelf_getehdr(elf, &ehdr) != &ehdr)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't read ELF header");
@@ -760,19 +887,21 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 			strtabidx = shdr.sh_link;
 			symbols = data;
 		}
-		else if(strcmp(shname, "kernel_version") == 0) {
+		else if(strcmp(shname, "kernel_version") == 0)
+		{
 			if(strcmp(osname.release, data->d_buf))
 			{
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "BPF probe is compiled for %s, but running version is %s",
-					 (char *) data->d_buf, osname.release);
+					 (char *)data->d_buf, osname.release);
 				goto cleanup;
 			}
 		}
-		else if(strcmp(shname, "probe_version") == 0) {
+		else if(strcmp(shname, "probe_version") == 0)
+		{
 			if(strcmp(PROBE_VERSION, data->d_buf))
 			{
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "BPF probe version is %s, but running version is %s",
-					 (char *) data->d_buf, PROBE_VERSION);
+					 (char *)data->d_buf, PROBE_VERSION);
 				goto cleanup;
 			}
 		}
@@ -796,7 +925,14 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 			goto cleanup;
 		}
 
-		if(load_maps(handle, maps, nr_maps) != SCAP_SUCCESS)
+		if(is_uprobe)
+		{
+			for(j = 0; j < nr_maps; ++j)
+			{
+				maps[j].fd = handle->m_bpf_map_fds[j];
+			}
+		}
+		else if(load_maps(handle, maps, nr_maps) != SCAP_SUCCESS)
 		{
 			goto cleanup;
 		}
@@ -818,7 +954,7 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 				continue;
 			}
 
-			insns = (struct bpf_insn *) data_prog->d_buf;
+			insns = (struct bpf_insn *)data_prog->d_buf;
 
 			if(parse_relocations(handle, data, symbols, &shdr, insns, maps, nr_maps))
 			{
@@ -827,10 +963,24 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		}
 	}
 
+load_prog:
 	for(j = 0; j < ehdr.e_shnum; ++j)
 	{
 		if(get_elf_section(elf, j, &ehdr, &shname, &shdr, &data) != SCAP_SUCCESS)
 		{
+			continue;
+		}
+		if(is_uprobe)
+		{
+			if(memcmp(shname, "uprobe/", sizeof("uprobe/") - 1) == 0 ||
+			   memcmp(shname, "uretprobe/", sizeof("uretprobe/") - 1) == 0)
+			{
+				res = load_and_attach(handle, shname, data->d_buf, data->d_size, target_file_path);
+				if(res != SCAP_SUCCESS && res != SCAP_UPROBE_SKIP)
+				{
+					goto cleanup;
+				}
+			}
 			continue;
 		}
 
@@ -839,14 +989,14 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		   memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
 		   memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0)
 		{
-			int load_result = load_tracepoint(handle, shname, data->d_buf, data->d_size);
+			res = load_and_attach(handle, shname, data->d_buf, data->d_size, NULL);
 			if((memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
 			    memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0) &&
-			   load_result == SCAP_UNKNOWN_KPROBE)
+			   res == SCAP_UNKNOWN_KPROBE)
 			{
-				continue ;
+				continue;
 			}
-			if(load_result != SCAP_SUCCESS)
+			if(res != SCAP_SUCCESS)
 			{
 				goto cleanup;
 			}
@@ -855,10 +1005,21 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 
 	res = SCAP_SUCCESS;
 cleanup:
-	elf_end(elf);
-	close(program_fd);
+	if(res != SCAP_SUCCESS && res != SCAP_UPROBE_SKIP)
+	{
+		elf_end(elf);
+		close(program_fd);
+	}
 	return res;
 }
+
+bool __load_uprobe(scap_t *handle, const char *path, bool is_uprobe, const char *target_file_path)
+{
+	int pre_idx = handle->m_uprobe_prog_cnt;
+	load_bpf_file(handle, path, is_uprobe, target_file_path);
+	return handle->m_uprobe_prog_cnt > pre_idx;
+}
+
 #endif // MINIMAL_BUILD
 
 static void *perf_event_mmap(scap_t *handle, int fd)
@@ -1048,7 +1209,7 @@ int32_t scap_bpf_stop_capture(scap_t *handle)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_set_snaplen(scap_t* handle, uint32_t snaplen)
+int32_t scap_bpf_set_snaplen(scap_t *handle, uint32_t snaplen)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1075,7 +1236,7 @@ int32_t scap_bpf_set_snaplen(scap_t* handle, uint32_t snaplen)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_set_fullcapture_port_range(scap_t* handle, uint16_t range_start, uint16_t range_end)
+int32_t scap_bpf_set_fullcapture_port_range(scap_t *handle, uint16_t range_start, uint16_t range_end)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1097,7 +1258,7 @@ int32_t scap_bpf_set_fullcapture_port_range(scap_t* handle, uint16_t range_start
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_set_statsd_port(scap_t* const handle, const uint16_t port)
+int32_t scap_bpf_set_statsd_port(scap_t *const handle, const uint16_t port)
 {
 	struct sysdig_bpf_settings settings = {};
 	int k = 0;
@@ -1119,7 +1280,7 @@ int32_t scap_bpf_set_statsd_port(scap_t* const handle, const uint16_t port)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_disable_dynamic_snaplen(scap_t* handle)
+int32_t scap_bpf_disable_dynamic_snaplen(scap_t *handle)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1140,22 +1301,22 @@ int32_t scap_bpf_disable_dynamic_snaplen(scap_t* handle)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_start_dropping_mode(scap_t* handle, uint32_t sampling_ratio)
+int32_t scap_bpf_start_dropping_mode(scap_t *handle, uint32_t sampling_ratio)
 {
 	switch(sampling_ratio)
 	{
-		case 1:
-		case 2:
-		case 4:
-		case 8:
-		case 16:
-		case 32:
-		case 64:
-		case 128:
-			break;
-		default:
-			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "invalid sampling ratio size");
-			return SCAP_FAILURE;
+	case 1:
+	case 2:
+	case 4:
+	case 8:
+	case 16:
+	case 32:
+	case 64:
+	case 128:
+		break;
+	default:
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "invalid sampling ratio size");
+		return SCAP_FAILURE;
 	}
 
 	struct sysdig_bpf_settings settings;
@@ -1178,7 +1339,7 @@ int32_t scap_bpf_start_dropping_mode(scap_t* handle, uint32_t sampling_ratio)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_stop_dropping_mode(scap_t* handle)
+int32_t scap_bpf_stop_dropping_mode(scap_t *handle)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1200,7 +1361,7 @@ int32_t scap_bpf_stop_dropping_mode(scap_t* handle)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_enable_dynamic_snaplen(scap_t* handle)
+int32_t scap_bpf_enable_dynamic_snaplen(scap_t *handle)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1221,7 +1382,7 @@ int32_t scap_bpf_enable_dynamic_snaplen(scap_t* handle)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_enable_page_faults(scap_t* handle)
+int32_t scap_bpf_enable_page_faults(scap_t *handle)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1242,7 +1403,7 @@ int32_t scap_bpf_enable_page_faults(scap_t* handle)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_enable_tracers_capture(scap_t* handle)
+int32_t scap_bpf_enable_tracers_capture(scap_t *handle)
 {
 	struct sysdig_bpf_settings settings;
 	int k = 0;
@@ -1290,7 +1451,7 @@ int32_t scap_bpf_close(scap_t *handle)
 			close(handle->m_devs[j].m_fd);
 		}
 	}
-
+	// clear tracepoint and kprobe pmc fd
 	for(j = 0; j < sizeof(handle->m_bpf_event_fd) / sizeof(handle->m_bpf_event_fd[0]); ++j)
 	{
 		if(handle->m_bpf_event_fd[j] > 0)
@@ -1299,13 +1460,40 @@ int32_t scap_bpf_close(scap_t *handle)
 			handle->m_bpf_event_fd[j] = 0;
 		}
 	}
-
+	// clear tracepoint and kprobe bpf prog fd
 	for(j = 0; j < sizeof(handle->m_bpf_prog_fds) / sizeof(handle->m_bpf_prog_fds[0]); ++j)
 	{
 		if(handle->m_bpf_prog_fds[j] > 0)
 		{
 			close(handle->m_bpf_prog_fds[j]);
 			handle->m_bpf_prog_fds[j] = 0;
+		}
+	}
+	// clear uprobe pmc fd
+	for(j = 0; j < sizeof(handle->m_uprobe_event_fd) / sizeof(handle->m_uprobe_event_fd[0]); ++j)
+	{
+		if(handle->m_uprobe_event_fd[j] > 0)
+		{
+			close(handle->m_uprobe_event_fd[j]);
+			handle->m_uprobe_event_fd[j] = 0;
+		}
+	}
+	// clear uprobe bpf prog fd
+	for(j = 0; j < sizeof(handle->m_uprobe_prog_fds) / sizeof(handle->m_uprobe_prog_fds[0]); ++j)
+	{
+		if(handle->m_uprobe_prog_fds[j] > 0)
+		{
+			close(handle->m_uprobe_prog_fds[j]);
+			handle->m_uprobe_prog_fds[j] = 0;
+		}
+	}
+	// clear uprobe array idx map
+	for(j = 0; j < sizeof(handle->m_uprobe_array_idx_is_used) / sizeof(handle->m_uprobe_array_idx_is_used[0]); ++j)
+	{
+		if(handle->m_uprobe_array_idx_is_used[j] > 0)
+		{
+			close(handle->m_uprobe_array_idx_is_used[j]);
+			handle->m_uprobe_array_idx_is_used[j] = false;
 		}
 	}
 
@@ -1319,6 +1507,7 @@ int32_t scap_bpf_close(scap_t *handle)
 	}
 
 	handle->m_bpf_prog_cnt = 0;
+	handle->m_uprobe_prog_cnt = 0;
 	handle->m_bpf_prog_array_map_idx = -1;
 
 	return SCAP_SUCCESS;
@@ -1341,7 +1530,7 @@ static int32_t set_boot_time(scap_t *handle, uint64_t *boot_time)
 		return SCAP_FAILURE;
 	}
 
-	now = tv_now.tv_sec * (uint64_t) 1000000000 + tv_now.tv_usec * 1000;
+	now = tv_now.tv_sec * (uint64_t)1000000000 + tv_now.tv_usec * 1000;
 
 	if(clock_gettime(CLOCK_BOOTTIME, &ts_uptime))
 	{
@@ -1349,7 +1538,7 @@ static int32_t set_boot_time(scap_t *handle, uint64_t *boot_time)
 		return SCAP_FAILURE;
 	}
 
-	uptime = ts_uptime.tv_sec * (uint64_t) 1000000000 + ts_uptime.tv_nsec;
+	uptime = ts_uptime.tv_sec * (uint64_t)1000000000 + ts_uptime.tv_nsec;
 
 	*boot_time = now - uptime;
 
@@ -1409,7 +1598,7 @@ static int32_t set_runtime_params(scap_t *handle)
 		// snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "Can't open /proc/sys/net/core/bpf_jit_kallsyms");
 		// return SCAP_FAILURE;
 		// compatibility for centos 7.6
-        	return SCAP_SUCCESS;
+		return SCAP_SUCCESS;
 	}
 
 	if(fprintf(f, "1") != 1)
@@ -1456,8 +1645,9 @@ static int32_t set_default_settings(scap_t *handle)
 	}
 	memset(settings.if_name, 0, 16);
 	int i = 0;
-	for (i = 0; i < PPM_EVENT_MAX; i++) {
-	    settings.events_mask[i] = true;
+	for(i = 0; i < PPM_EVENT_MAX; i++)
+	{
+		settings.events_mask[i] = true;
 	}
 
 	int k = 0;
@@ -1492,7 +1682,7 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 		return SCAP_FAILURE;
 	}
 
-	if(load_bpf_file(handle, bpf_probe) != SCAP_SUCCESS)
+	if(load_bpf_file(handle, bpf_probe, false, NULL) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
@@ -1566,7 +1756,7 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "processors online: %d, expected: %d", online_cpu, handle->m_ndevs);
 			return SCAP_FAILURE;
 		}
-
+		// open pmc for bpf perf event
 		pmu_fd = sys_perf_event_open(&attr, -1, j, -1, 0);
 		if(pmu_fd < 0)
 		{
@@ -1615,7 +1805,7 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 #endif // MINIMAL_BUILD
 }
 
-int32_t scap_bpf_get_stats(scap_t* handle, OUT scap_stats* stats)
+int32_t scap_bpf_get_stats(scap_t *handle, OUT scap_stats *stats)
 {
 	int j;
 
@@ -1641,7 +1831,7 @@ int32_t scap_bpf_get_stats(scap_t* handle, OUT scap_stats* stats)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_get_n_tracepoint_hit(scap_t* handle, long* ret)
+int32_t scap_bpf_get_n_tracepoint_hit(scap_t *handle, long *ret)
 {
 	int j;
 
@@ -1704,9 +1894,9 @@ int32_t scap_bpf_disable_skb_capture(scap_t *handle)
 	return SCAP_SUCCESS;
 }
 
-int32_t scap_bpf_handle_eventmask(scap_t* handle, uint32_t op, uint32_t event_id)
+int32_t scap_bpf_handle_eventmask(scap_t *handle, uint32_t op, uint32_t event_id)
 {
-	if (event_id >= PPM_EVENT_MAX || event_id < 0)
+	if(event_id >= PPM_EVENT_MAX || event_id < 0)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "illegal event type");
 		return SCAP_FAILURE;

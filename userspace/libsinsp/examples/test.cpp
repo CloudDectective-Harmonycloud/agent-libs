@@ -82,7 +82,6 @@ int main(int argc, char **argv)
     signal(SIGPIPE, sigint_handler);
 
     inspector.open();
-
     if(!filter_string.empty())
     {
         try
@@ -122,7 +121,7 @@ int main(int argc, char **argv)
                 sinsp_utils::ts_to_iso_8601(ev->get_ts(), &date_time);
 
                 bool is_host_proc = thread->m_container_id.empty();
-                cout << "[" << date_time << "]:["  
+                cout << "[" << date_time << "]:["
 			              << (is_host_proc ? "HOST" : thread->m_container_id) << "]:";
 
                 cout << "[CAT=";

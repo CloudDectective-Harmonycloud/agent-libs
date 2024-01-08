@@ -956,6 +956,16 @@ static int32_t _scap_proc_scan_proc_dir_impl(scap_t* handle, char* procdirname, 
 	uint64_t last_tid_processed = 0;
 	struct scap_ns_socket_list* sockets_by_ns = NULL;
 
+	char *uprobe_mode = getenv("enable_uprobe");
+	if (uprobe_mode != NULL && strncmp("true", uprobe_mode, sizeof(uprobe_mode)) == 0) 
+	{
+		handle->enable_uprobe = true;
+	}
+	else 
+	{
+		handle->enable_uprobe = false;
+	}
+
 	dir_p = opendir(procdirname);
 
 	if(dir_p == NULL)

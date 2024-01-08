@@ -874,6 +874,7 @@ void sinsp::on_new_entry_from_proc(void* context,
 		{
 			thread_added = m_thread_manager->add_thread(newti, true);
 		}
+
 		if (!thread_added) {
 			delete newti;
 		}
@@ -886,7 +887,6 @@ void sinsp::on_new_entry_from_proc(void* context,
 		{
 			sinsp_threadinfo* newti = build_threadinfo();
 			newti->init(tinfo);
-
 			if (!m_thread_manager->add_thread(newti, true)) {
 				ASSERT(false);
 				delete newti;

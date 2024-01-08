@@ -23,3 +23,6 @@ driver/driver_config.h
 .vscode
 .cache.mk
 build*
+.idea/
+cmake-build-debug/
+kindling-falcolib-probe.tar.gz

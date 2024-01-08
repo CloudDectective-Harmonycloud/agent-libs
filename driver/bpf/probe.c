@@ -47,6 +47,14 @@ int bpf_kp_##event(struct pt_regs *ctx)
 __bpf_section(KRET_NAME #event)				\
 int bpf_kret_##event(struct pt_regs *ctx)
 
+#define BPF_UPROBE(event, func_symbol)			\
+__bpf_section(UP_NAME #event ":" #func_symbol)			\
+int bpf_up_##event(struct pt_regs *ctx)
+
+#define BPF_URET_PROBE(event, func_symbol)			\
+__bpf_section(URET_NAME #event ":" #func_symbol)			\
+int bpf_uret_##event(struct pt_regs *ctx)
+
 BPF_PROBE("raw_syscalls/", sys_enter, sys_enter_args)
 {
 	const struct syscall_evt_pair *sc_evt;
@@ -131,7 +139,7 @@ BPF_PROBE("raw_syscalls/", sys_exit, sys_exit_args)
 		u64 exit_time = bpf_ktime_get_ns();
 		bpf_map_update_elem(&cpu_focus_threads, &tid, &exit_time, BPF_ANY);
 	}
-	
+
 #endif
 	if (!settings->capture_enabled)
 		return 0;
@@ -754,6 +762,50 @@ BPF_KPROBE(sock_sendmsg) {
 	return 0;
 }
 #endif
+
+
+BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader)
+{
+    struct sysdig_bpf_settings *settings;
+    
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+
+	if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_ENCODE_E, settings, UF_NEVER_DROP)) {
+		bpf_probe_loopy_writer_write_header(ctx);
+	}
+    return 0;
+}
+
+BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders)
+{
+    struct sysdig_bpf_settings *settings;
+    
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+
+	if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_SERVER_RECV_E, settings, UF_NEVER_DROP)) {
+		bpf_probe_http2_server_operate_headers(ctx);
+	}
+    return 0;
+}
+
+BPF_UPROBE(probe_http2_client_operate_headers, google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders)
+{
+    struct sysdig_bpf_settings *settings;
+    
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+
+	if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_CLIENT_RECV_E, settings, UF_NEVER_DROP)) {
+		bpf_probe_http2_client_operate_headers(ctx);
+	}
+    return 0;
+}
+
 char kernel_ver[] __bpf_section("kernel_version") = UTS_RELEASE;
 
 char __license[] __bpf_section("license") = "GPL";

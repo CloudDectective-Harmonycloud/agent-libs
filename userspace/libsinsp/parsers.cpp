@@ -19,6 +19,7 @@ limitations under the License.
 #define NOMINMAX
 #include <winsock2.h>
 #else
+#include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -38,6 +39,11 @@ limitations under the License.
 #include "filter.h"
 #include "filterchecks.h"
 #include "protodecoder.h"
+using namespace std;
+#define NONE         "\033[m"
+#define RED          "\033[0;32;31m"
+#define GREEN        "\033[0;32;32m"
+
 #ifdef SIMULATE_DROP_MODE
 bool should_drop(sinsp_evt *evt);
 #endif
@@ -586,6 +592,7 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	// If we're exiting a clone or if we have a scheduler event
 	// (many kernel thread), we don't look for /proc
 	//
+
 	bool query_os;
 	if(etype == PPME_SYSCALL_CLONE_11_X ||
 		etype == PPME_SYSCALL_CLONE_16_X ||
@@ -767,7 +774,6 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 			}
 		}
 	}
-
 	return true;
 }
 

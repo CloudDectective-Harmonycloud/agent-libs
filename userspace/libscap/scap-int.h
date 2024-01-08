@@ -156,11 +156,18 @@ struct scap
 	// Anonymous struct with bpf stuff
 	struct
 	{
+		// save BPF prog fds used for close
 		int m_bpf_prog_fds[BPF_PROGS_MAX];
 		int m_bpf_prog_cnt;
 		bool m_bpf_fillers[BPF_PROGS_MAX];
 		int m_bpf_event_fd[BPF_PROGS_MAX];
 		int m_bpf_map_fds[BPF_MAPS_MAX];
+
+		int m_uprobe_prog_fds[4 * BPF_PROGS_MAX];
+		int m_uprobe_event_fd[4 * BPF_PROGS_MAX];
+		bool m_uprobe_array_idx_is_used[4 * BPF_PROGS_MAX];
+		int m_uprobe_prog_cnt;
+
 		int m_bpf_prog_array_map_idx;
 	};
 
@@ -182,6 +189,8 @@ struct scap
 	// /proc scan parameters
 	uint64_t m_proc_scan_timeout_ms;
 	uint64_t m_proc_scan_log_interval_ms;
+
+	bool enable_uprobe;
 
 	// Function which may be called to log a debug event
 	void(*m_debug_log_fn)(const char* msg);

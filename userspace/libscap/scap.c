@@ -141,6 +141,10 @@ static uint32_t get_max_consumers()
 	return 0;
 }
 
+bool load_uprobe(scap_t *handle, const char *path, bool is_uprobe, const char *target_file_path) {
+	return __load_uprobe(handle, path, is_uprobe, target_file_path);
+}
+
 #ifndef _WIN32
 scap_t* scap_open_live_int(char *error, int32_t *rc,
 			   proc_entry_callback proc_callback,
@@ -326,6 +330,7 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	//
 	// Open and initialize all the devices
 	//
+    // if support bpf
 	if(handle->m_bpf)
 	{
 		if((*rc = scap_bpf_load(handle, bpf_probe)) != SCAP_SUCCESS)

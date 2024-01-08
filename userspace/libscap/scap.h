@@ -72,6 +72,8 @@ struct iovec;
 #define SCAP_FAILURE 1
 #define SCAP_TIMEOUT -1
 #define SCAP_UNKNOWN_KPROBE -2
+#define SCAP_UPROBE_SKIP -3
+#define SCAP_UPROBE_ARRAY_FULL -4
 #define SCAP_ILLEGAL_INPUT 3
 #define SCAP_NOTFOUND 4
 #define SCAP_INPUT_TOO_SMALL 5
@@ -641,6 +643,8 @@ scap_t* scap_open_offline_fd(int fd, char *error, int32_t *rc);
   \return The capture instance handle in case of success. NULL in case of failure.
 */
 scap_t* scap_open(scap_open_args args, char *error, int32_t *rc);
+
+bool load_uprobe(scap_t *handle, const char *path, bool is_uprobe, const char *user_probe_path);
 
 /*!
   \brief Close a capture handle.

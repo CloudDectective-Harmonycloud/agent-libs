@@ -54,6 +54,7 @@ list(APPEND targetfiles
 	scap_savefile.c
 	scap_procs.c
 	scap_userlist.c
+	scap_func_symbol.c
 	syscall_info_table.c
 	../../driver/dynamic_params_table.c
 	../../driver/event_table.c

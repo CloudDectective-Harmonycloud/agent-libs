@@ -15,7 +15,7 @@ limitations under the License.
 
 SUBCOMPONENTS:
 
-- The file <common/inttypes_win.h> is licensed separately, see the header 
+- The file <common/inttypes_win.h> is licensed separately, see the header
   of the file. Copyright (c) 2006 Alexander Chemeris.
 
 - The files in <driver/> and its subdirectories are used to compile the
@@ -26,3 +26,7 @@ SUBCOMPONENTS:
 - The files in <userspace/libsinsp/third-party/jsoncpp> and its 
   subdirectories are licensed separately, see the headers of each file. 
   Copyright (c) 2007-2010 Baptiste Lepilleur.
+
+- The two files userspace/libscap/scap_func_symbol.c and
+  userspace/libscap/scap_func_symbol.h are licensed with apache 2.0.
+  Copyright (c) 2016 GitHub, Inc.
