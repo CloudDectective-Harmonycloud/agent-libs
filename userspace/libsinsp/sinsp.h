@@ -792,6 +792,9 @@ public:
 	*/
 	void unset_eventmask(uint32_t event_id);
 
+	void mark_kt_of_interest(uint32_t tp, bool enabled = true);
+
+	std::unordered_map<string, int> get_all_kt();
 	/*!
 	  \brief When reading events from a trace file, this function returns the
 	   read progress as a number between 0 and 100.

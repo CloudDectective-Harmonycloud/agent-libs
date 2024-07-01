@@ -72,7 +72,17 @@ typedef struct wh_t wh_t;
 //
 #define BPF_PROGS_MAX 128
 #define BPF_MAPS_MAX 32
-
+struct bpf_prog {
+	int fd;
+	int efd;
+	char name[255];
+};
+//For the real index that loaded kprobe and tracepoint events in struct bpf_prog bpf_progs.
+struct kt_index {
+	char name[255];
+	int index;
+	bool interest;
+};
 //
 // The device descriptor
 //
@@ -156,13 +166,19 @@ struct scap
 	// Anonymous struct with bpf stuff
 	struct
 	{
-		int m_bpf_prog_fds[BPF_PROGS_MAX];
+		char m_filepath[SCAP_MAX_PATH_SIZE];
+		struct bpf_prog m_bpf_progs[BPF_PROGS_MAX];
 		int m_bpf_prog_cnt;
 		bool m_bpf_fillers[BPF_PROGS_MAX];
-		int m_bpf_event_fd[BPF_PROGS_MAX];
 		int m_bpf_map_fds[BPF_MAPS_MAX];
 		int m_bpf_prog_array_map_idx;
 	};
+	// Anonymous struct with tracepoints and kprobe of interest
+	struct {
+		struct  kt_index kt_indices[BPF_PROGS_MAX];
+		int	m_bpf_prog_real_size; // the real size of bpf program in probe.o
+	};
+
 
 	// The set of process names that are suppressed
 	char **m_suppressed_comms;

@@ -994,7 +994,14 @@ int32_t scap_set_eventmask(scap_t* handle, uint32_t event_id);
 */
 int32_t scap_unset_eventmask(scap_t* handle, uint32_t event_id);
 
+/*!
+ \brief enabled the event fd
 
+ \param handle Handle to the capture instance.
+ \param enabled true or false
+ \note This function can only be called for live captures.
+ */
+int32_t scap_set_ktmask(scap_t* handle, uint32_t kt, bool enabled);
 /*!
   \brief Get the root directory of the system. This usually changes
   if running in a container, so that all the information for the
