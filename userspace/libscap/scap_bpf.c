@@ -711,7 +711,8 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 
 static bool is_kt_enabled(scap_t *handle, char* event_name){
 	bool enabled = true;
-	for(int i = 0; i < handle->m_bpf_prog_real_size; i++){
+	int i;
+	for(i = 0; i < handle->m_bpf_prog_real_size; i++){
 		if(strcmp(event_name, handle->kt_indices[i].name) == 0){
 			enabled = handle->kt_indices[i].interest;
 			break;
@@ -865,7 +866,8 @@ static int32_t load_bpf_file(scap_t *handle)
 		if(is_kt_enabled(handle, shname))
 		{
 			bool already_attached = false;
-			for(int i = 0; i < handle->m_bpf_prog_cnt && !already_attached; i++)
+			int i;
+			for(i = 0; i < handle->m_bpf_prog_cnt && !already_attached; i++)
 			{
 				if(strcmp(handle->m_bpf_progs[i].name, shname) == 0)
 				{
