@@ -83,6 +83,7 @@ set(SINSP_SOURCES
 	threadinfo.cpp
 	tuples.cpp
 	sinsp.cpp
+	sinsp_tp.cpp
 	stats.cpp
 	table.cpp
 	token_bucket.cpp

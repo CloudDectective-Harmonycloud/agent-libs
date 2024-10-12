@@ -2200,6 +2200,10 @@ int32_t scap_unset_eventmask(scap_t* handle, uint32_t event_id) {
 #endif
 }
 
+int32_t scap_set_ktmask(scap_t* handle, uint32_t kt, bool enabled){
+	return scap_set_ktmask_bpf(handle, kt, enabled);
+}
+
 uint32_t scap_event_get_dump_flags(scap_t* handle)
 {
 	return handle->m_last_evt_dump_flags;

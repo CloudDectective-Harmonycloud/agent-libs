@@ -522,6 +522,7 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 	bool is_raw_tracepoint = strncmp(event, "raw_tracepoint/", 15) == 0;
 
 	insns_cnt = size / sizeof(struct bpf_insn);
+	char *full_event = event;
 
 	attr.type = PERF_TYPE_TRACEPOINT;
 	attr.sample_type = PERF_SAMPLE_RAW;
@@ -593,7 +594,21 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 
 	free(error);
 
-	handle->m_bpf_prog_fds[handle->m_bpf_prog_cnt++] = fd;
+	handle->m_bpf_progs[handle->m_bpf_prog_cnt].fd = fd;
+	strncpy(handle->m_bpf_progs[handle->m_bpf_prog_cnt].name, full_event, NAME_MAX);
+
+
+	//When loading all eBPF programs for the first time, update the kt_indices.
+	if(handle->m_bpf_prog_cnt + 1 > handle->m_bpf_prog_real_size){
+		strncpy(handle->kt_indices[handle->m_bpf_prog_real_size].name, full_event, NAME_MAX);
+		handle->kt_indices[handle->m_bpf_prog_real_size].index = handle->m_bpf_prog_cnt;
+		handle->kt_indices[handle->m_bpf_prog_real_size].interest = true;
+		handle->m_bpf_prog_real_size++;
+	}
+
+	handle->m_bpf_prog_cnt++;
+	//printf("prog_type:%d, insns_cnt:%d, license: %s, fd: %d\n", program_type, insns_cnt, license, fd);
+
 
 	if(memcmp(event, "filler/", sizeof("filler/") - 1) == 0)
 	{
@@ -687,14 +702,27 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			return SCAP_FAILURE;
 		}
 	}
-
-	handle->m_bpf_event_fd[handle->m_bpf_prog_cnt - 1] = efd;
+	handle->m_bpf_progs[handle->m_bpf_prog_cnt - 1].efd = efd;
 
 	return SCAP_SUCCESS;
 }
 
 #ifndef MINIMAL_BUILD
-static int32_t load_bpf_file(scap_t *handle, const char *path)
+
+static bool is_kt_enabled(scap_t *handle, char* event_name){
+	bool enabled = true;
+	int i;
+	for(i = 0; i < handle->m_bpf_prog_real_size; i++){
+		if(strcmp(event_name, handle->kt_indices[i].name) == 0){
+			enabled = handle->kt_indices[i].interest;
+			break;
+		}
+	}
+
+	return enabled;
+}
+
+static int32_t load_bpf_file(scap_t *handle)
 {
 	int j;
 	int maps_shndx = 0;
@@ -706,8 +734,8 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 	Elf_Data *symbols = NULL;
 	char *shname;
 	char *shname_prog;
-	int nr_maps = 0;
-	struct bpf_map_data maps[BPF_MAPS_MAX];
+	static int nr_maps = 0;
+	static struct bpf_map_data maps[BPF_MAPS_MAX];
 	struct utsname osname;
 	int32_t res = SCAP_FAILURE;
 
@@ -723,10 +751,10 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		return SCAP_FAILURE;
 	}
 
-	int program_fd = open(path, O_RDONLY, 0);
+	int program_fd = open(handle->m_filepath, O_RDONLY, 0);
 	if(program_fd < 0)
 	{
-		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't open BPF probe '%s': %s", path, scap_strerror(handle, errno));
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't open BPF probe '%s': %s", handle->m_filepath, scap_strerror(handle, errno));
 		return SCAP_FAILURE;
 	}
 
@@ -788,9 +816,11 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "missing SHT_SYMTAB section");
 		goto cleanup;
 	}
-
-	if(maps_shndx)
+	//Map initialization occurs only upon the map's first load.
+	static bool first_load_map = true;
+	if(maps_shndx && first_load_map)
 	{
+		first_load_map = false;
 		if(load_elf_maps_section(handle, maps, maps_shndx, elf, symbols, strtabidx, &nr_maps) != SCAP_SUCCESS)
 		{
 			goto cleanup;
@@ -833,7 +863,19 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		{
 			continue;
 		}
-
+		if(is_kt_enabled(handle, shname))
+		{
+			bool already_attached = false;
+			int i;
+			for(i = 0; i < handle->m_bpf_prog_cnt && !already_attached; i++)
+			{
+				if(strcmp(handle->m_bpf_progs[i].name, shname) == 0)
+				{
+					already_attached = true;
+				}
+			}
+			if(!already_attached)
+			{
 		if(memcmp(shname, "tracepoint/", sizeof("tracepoint/") - 1) == 0 ||
 		   memcmp(shname, "raw_tracepoint/", sizeof("raw_tracepoint/") - 1) == 0 ||
 		   memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
@@ -851,6 +893,9 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 				goto cleanup;
 			}
 		}
+	}
+		}
+
 	}
 
 	res = SCAP_SUCCESS;
@@ -1263,6 +1308,19 @@ int32_t scap_bpf_enable_tracers_capture(scap_t* handle)
 	return SCAP_SUCCESS;
 }
 
+static void close_prog(struct bpf_prog *prog)
+{
+	if(prog->efd > 0)
+	{
+		int res = close(prog->efd);
+	}
+	if(prog->fd > 0)
+	{
+		int res = close(prog->fd);
+	}
+	memset(prog, 0, sizeof(*prog));
+}
+
 int32_t scap_bpf_close(scap_t *handle)
 {
 	int j;
@@ -1291,23 +1349,16 @@ int32_t scap_bpf_close(scap_t *handle)
 		}
 	}
 
-	for(j = 0; j < sizeof(handle->m_bpf_event_fd) / sizeof(handle->m_bpf_event_fd[0]); ++j)
-	{
-		if(handle->m_bpf_event_fd[j] > 0)
+	for(j = 0; j < sizeof(handle->m_bpf_progs) / sizeof(handle->m_bpf_progs[0]); ++j)
 		{
-			close(handle->m_bpf_event_fd[j]);
-			handle->m_bpf_event_fd[j] = 0;
-		}
+		close_prog(&handle->m_bpf_progs[j]);
 	}
 
-	for(j = 0; j < sizeof(handle->m_bpf_prog_fds) / sizeof(handle->m_bpf_prog_fds[0]); ++j)
-	{
-		if(handle->m_bpf_prog_fds[j] > 0)
+	for(j = 0; j < handle->m_bpf_prog_real_size; ++j)
 		{
-			close(handle->m_bpf_prog_fds[j]);
-			handle->m_bpf_prog_fds[j] = 0;
+		handle->kt_indices[j].index = -1;
 		}
-	}
+
 
 	for(j = 0; j < sizeof(handle->m_bpf_map_fds) / sizeof(handle->m_bpf_map_fds[0]); ++j)
 	{
@@ -1322,6 +1373,93 @@ int32_t scap_bpf_close(scap_t *handle)
 	handle->m_bpf_prog_array_map_idx = -1;
 
 	return SCAP_SUCCESS;
+}
+
+static int32_t scap_bpf_handle_kt_mask( scap_t *handle, uint32_t op, uint32_t kt_index)
+{
+	// error kt_index
+	if(kt_index < 0 || kt_index > handle->m_bpf_prog_real_size)
+		return SCAP_SUCCESS;
+
+	int prg_idx = handle->kt_indices[kt_index].index;
+
+	// We want to unload a never loaded tracepoint
+	if (prg_idx == -1 && op != PPM_IOCTL_MASK_SET_TP)
+	{
+		return SCAP_SUCCESS;
+	}
+	// We want to load an already loaded tracepoint
+	if (prg_idx >= 0 && op != PPM_IOCTL_MASK_UNSET_TP)
+	{
+		return SCAP_SUCCESS;
+	}
+
+	if (op == PPM_IOCTL_MASK_UNSET_TP)
+	{
+		// Algo:
+		// Close the event and tracepoint fds,
+		// reduce number of prog cnt
+		// move left remaining array elements
+		// reset last array element
+		handle->kt_indices[kt_index].index = -1;
+		handle->kt_indices[kt_index].interest = false;
+
+		close_prog(&handle->m_bpf_progs[prg_idx]);
+		handle->m_bpf_prog_cnt--;
+		size_t byte_size = (handle->m_bpf_prog_cnt - prg_idx) * sizeof(handle->m_bpf_progs[prg_idx]);
+		if (byte_size > 0)
+		{
+			memmove(&handle->m_bpf_progs[prg_idx], &handle->m_bpf_progs[prg_idx + 1], byte_size);
+		}
+		memset(&handle->m_bpf_progs[handle->m_bpf_prog_cnt], 0, sizeof(handle->m_bpf_progs[handle->m_bpf_prog_cnt]));
+		return SCAP_SUCCESS;
+	}
+
+	handle->kt_indices[kt_index].interest = true;
+	return load_bpf_file(handle);
+}
+
+static int32_t scap_handle_ktmask(scap_t* handle, uint32_t op, uint32_t kt)
+{
+	switch(op)
+	{
+	case PPM_IOCTL_MASK_SET_TP:
+	case PPM_IOCTL_MASK_UNSET_TP:
+		break;
+
+	default:
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "%s(%d) internal error", __FUNCTION__, op);
+		ASSERT(false);
+		return SCAP_FAILURE;
+		break;
+	}
+
+	if (kt >= BPF_PROGS_MAX)
+	{
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "%s(%d) wrong param", __FUNCTION__, kt);
+		ASSERT(false);
+		return SCAP_FAILURE;
+	}
+
+	if(handle)
+	{
+		return scap_bpf_handle_kt_mask(handle, op, kt);
+	}
+#if !defined(HAS_CAPTURE) || defined(_WIN32)
+	snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "tpmask not supported on %s", PLATFORM_NAME);
+	return SCAP_FAILURE;
+#else
+	if (handle == NULL)
+	{
+		return SCAP_FAILURE;
+	}
+
+	snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "manipulating tpmask not supported on this scap mode");
+	return SCAP_FAILURE;
+#endif // HAS_CAPTURE
+}
+int32_t scap_set_ktmask_bpf(scap_t* handle, uint32_t kt, bool enabled) {
+	return(scap_handle_ktmask(handle, enabled ? PPM_IOCTL_MASK_SET_TP : PPM_IOCTL_MASK_UNSET_TP, kt));
 }
 
 //
@@ -1491,8 +1629,8 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 		ASSERT(false);
 		return SCAP_FAILURE;
 	}
-
-	if(load_bpf_file(handle, bpf_probe) != SCAP_SUCCESS)
+	snprintf(handle->m_filepath, SCAP_MAX_PATH_SIZE, "%s", bpf_probe);
+	if(load_bpf_file(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
